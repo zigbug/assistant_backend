@@ -1,0 +1,21 @@
+# This file configures the static analysis warnings and errors
+# For details see: https://dart.dev/guides/language/analysis-options
+
+include: package:lints/recommended.yaml
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.drift.dart"
+  
+  language:
+    strict-casts: true
+    strict-raw-types: true
+
+linter:
+  rules:
+    - prefer_single_quotes
+    - prefer_final_locals
+    - prefer_const_constructors
+    - prefer_const_declarations
+    - avoid_print

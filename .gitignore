@@ -1,0 +1,47 @@
+# Dart/Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+flutter_*.png
+linked_*.ds
+unlinked.ds
+unlinked_spec.ds
+
+# SQLite database (local development)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated files
+*.g.dart
+*.drift.dart
+
+# Logs
+*.log
+
+# Coverage
+coverage/
