@@ -1,5 +1,12 @@
 import 'package:drift/drift.dart';
 
+import 'daos/ai_lessons_dao.dart';
+import 'daos/daily_plans_dao.dart';
+import 'daos/events_dao.dart';
+import 'daos/notes_dao.dart';
+import 'daos/preferences_dao.dart';
+import 'daos/projects_dao.dart';
+import 'daos/tasks_dao.dart';
 import 'tables/ai_lessons.dart';
 import 'tables/daily_plan_items.dart';
 import 'tables/daily_plans.dart';
@@ -33,19 +40,41 @@ part 'database.g.dart';
 /// Пример использования:
 /// ```dart
 /// final db = createDatabase();
-/// final tasks = await db.getAllTasks(); // методы появятся после build_runner
+///
+/// // Работа с задачами
+/// final tasks = await db.tasksDao.getActive();
+/// await db.tasksDao.complete(42);
+///
+/// // Работа с планом дня
+/// final today = DateTime.now();
+/// final plan = await db.dailyPlansDao.getOrCreateForDate(today);
+///
+/// // Работа с настройками
+/// final workStart = await db.preferencesDao.get('work_start');
+///
 /// await db.close();
 /// ```
-@DriftDatabase(tables: [
-  Projects,
-  Tasks,
-  Events,
-  DailyPlans,
-  DailyPlanItems,
-  Preferences,
-  Notes,
-  AiLessons,
-])
+@DriftDatabase(
+  tables: [
+    Projects,
+    Tasks,
+    Events,
+    DailyPlans,
+    DailyPlanItems,
+    Preferences,
+    Notes,
+    AiLessons,
+  ],
+  daos: [
+    ProjectsDao,
+    TasksDao,
+    EventsDao,
+    DailyPlansDao,
+    NotesDao,
+    PreferencesDao,
+    AiLessonsDao,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
