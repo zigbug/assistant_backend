@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import 'database.dart';
 
@@ -81,14 +80,14 @@ File get _sqliteFile {
   return File(p.join(dbDir.path, 'assistant.db'));
 }
 
-/// Вспомогательная функция для получения пути к data-директории
-/// через path_provider (для мобильных/десктопных приложений).
-/// Оставлена на будущее, когда понадобится корректный кроссплатформенный путь.
-Future<Directory> getDataDirectory() async {
-  final appDir = await getApplicationSupportDirectory();
-  final dataDir = Directory(p.join(appDir.path, 'assistant_backend'));
-  if (!await dataDir.exists()) {
-    await dataDir.create(recursive: true);
-  }
-  return dataDir;
-}
+// /// Вспомогательная функция для получения пути к data-директории
+// /// через path_provider (для мобильных/десктопных приложений).
+// /// Оставлена на будущее, когда понадобится корректный кроссплатформенный путь.
+// Future<Directory> getDataDirectory() async {
+//   final appDir = await getApplicationSupportDirectory();
+//   final dataDir = Directory(p.join(appDir.path, 'assistant_backend'));
+//   if (!await dataDir.exists()) {
+//     await dataDir.create(recursive: true);
+//   }
+//   return dataDir;
+// }

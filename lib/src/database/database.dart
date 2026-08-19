@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
+import 'package:path/path.dart' as p;
 
 import 'daos/ai_lessons_dao.dart';
 import 'daos/daily_plans_dao.dart';
@@ -131,4 +135,58 @@ class AppDatabase extends _$AppDatabase {
       );
     }
   }
+}
+
+/// Возвращает директорию для хранения данных приложения (кроссплатформенно).
+///
+/// - Windows: `%APPDATA%/assistant_backend` (например, `C:\Users\Denis\AppData\Roaming\assistant_backend`)
+/// - Linux: `$HOME/.local/share/assistant_backend`
+/// - macOS: `$HOME/Library/Application Support/assistant_backend`
+Directory _getDataDirectory() {
+  final String homePath;
+
+  if (Platform.isWindows) {
+    // На Windows используем %APPDATA% (Roaming)
+    homePath = Platform.environment['APPDATA'] ??
+        Platform.environment['USERPROFILE'] ??
+        '.';
+    return Directory(p.join(homePath, 'assistant_backend'));
+  } else if (Platform.isMacOS) {
+    // macOS: ~/Library/Application Support/assistant_backend
+    homePath = Platform.environment['HOME'] ?? '~';
+    return Directory(p.join(
+        homePath, 'Library', 'Application Support', 'assistant_backend'));
+  } else {
+    // Linux: ~/.local/share/assistant_backend (XDG стандарт)
+    homePath = Platform.environment['HOME'] ?? '~';
+    return Directory(p.join(homePath, '.local', 'share', 'assistant_backend'));
+  }
+}
+
+/// Фабричная функция для создания экземпляра базы данных.
+///
+/// Использует SQLite для локальной разработки. Файл базы данных создаётся
+/// в директории приложения (например, на Windows: %APPDATA%/assistant_backend).
+///
+/// Для тестирования можно передать `inMemory: true`, чтобы база создавалась
+/// в оперативной памяти и удалялась после закрытия.
+AppDatabase createDatabase({bool inMemory = false}) {
+  if (inMemory) {
+    // In-memory база для тестов
+    return AppDatabase(NativeDatabase.memory());
+  }
+
+  // Создаём LazyDatabase, чтобы база открывалась лениво (при первом запросе)
+  return AppDatabase(
+    LazyDatabase(() async {
+      // Определяем директорию для хранения файла БД
+      final dbFolder = _getDataDirectory();
+      final file = File(p.join(dbFolder.path, 'assistant.db'));
+
+      print('Database file location: ${file.path}');
+
+      // Возвращаем NativeDatabase с путём к файлу
+      return NativeDatabase.createInBackground(file);
+    }),
+  );
 }
