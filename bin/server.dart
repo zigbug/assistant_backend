@@ -7,6 +7,7 @@ import 'package:shelf_router/shelf_router.dart';
 
 import 'package:assistant_backend/src/config/constants.dart';
 import 'package:assistant_backend/src/database/database.dart';
+import 'package:assistant_backend/src/database/daos/preferences_dao.dart';
 import 'package:assistant_backend/src/database/daos/projects_dao.dart';
 import 'package:assistant_backend/src/database/daos/tasks_dao.dart';
 
@@ -68,6 +69,7 @@ Router createRouter(AppDatabase db) {
   final router = Router();
   final tasksDao = TasksDao(db);
   final projectsDao = ProjectsDao(db);
+  final preferencesDao = PreferencesDao(db);
 
   // === Health Check ===
   // Простой эндпоинт для проверки работоспособности сервера.
@@ -640,6 +642,111 @@ Router createRouter(AppDatabase db) {
     } catch (e, stackTrace) {
       print('Error deleting project $id: $e\n$stackTrace');
       return jsonResponse(500, {'error': 'Failed to delete project'});
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // PREFERENCES ENDPOINTS
+  // ---------------------------------------------------------------------------
+
+  // GET /api/v1/preferences
+  // Возвращает все настройки пользователя как JSON-объект (Map<String, String>).
+  // Используется MCP/Qwen для получения контекста перед генерацией плана дня.
+  apiRouter.get('/preferences', (Request request) async {
+    try {
+      final allPrefs = await preferencesDao.getAll();
+      return jsonResponse(200, allPrefs);
+    } catch (e, stackTrace) {
+      print('Error fetching preferences: $e\n$stackTrace');
+      return jsonResponse(500, {'error': 'Failed to fetch preferences'});
+    }
+  });
+
+  // PATCH /api/v1/preferences
+  // Обновляет несколько настроек одновременно.
+  // Ожидает JSON-объект с парами key-value, например:
+  //   { "work_start": "08:30", "peak_hours": "morning" }
+  // Возвращает обновлённый набор всех настроек.
+  apiRouter.patch('/preferences', (Request request) async {
+    try {
+      final payload = await request.readAsString();
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+
+      if (data.isEmpty) {
+        return jsonResponse(400, {'error': 'Request body must be a non-empty object'});
+      }
+
+      // Валидация: все ключи и значения должны быть строками
+      final Map<String, String> updates = {};
+      for (final entry in data.entries) {
+        if (entry.key.isEmpty || entry.key.length > 100) {
+          return jsonResponse(400, {
+            'error': 'Invalid key "${entry.key}": must be 1-100 characters',
+          });
+        }
+        if (entry.value == null) {
+          return jsonResponse(400, {
+            'error': 'Value for key "${entry.key}" cannot be null',
+          });
+        }
+        updates[entry.key] = entry.value.toString();
+      }
+
+      await preferencesDao.setMany(updates);
+
+      // Возвращаем полный набор настроек после обновления
+      final allPrefs = await preferencesDao.getAll();
+      return jsonResponse(200, allPrefs);
+    } catch (e, stackTrace) {
+      print('Error updating preferences: $e\n$stackTrace');
+      return jsonResponse(500, {'error': 'Failed to update preferences'});
+    }
+  });
+
+  // GET /api/v1/preferences/<key>
+  // Получает одну настройку по ключу. Возвращает 404 если ключ не существует.
+  apiRouter.get('/preferences/<key>', (Request request, String key) async {
+    try {
+      final value = await preferencesDao.get(key);
+      if (value == null) {
+        return jsonResponse(404, {
+          'error': 'Preference "$key" not found',
+        });
+      }
+      return jsonResponse(200, {'key': key, 'value': value});
+    } catch (e, stackTrace) {
+      print('Error fetching preference $key: $e\n$stackTrace');
+      return jsonResponse(500, {'error': 'Failed to fetch preference'});
+    }
+  });
+
+  // PUT /api/v1/preferences/<key>
+  // Создаёт или обновляет одну настройку по ключу.
+  // Ожидает JSON: { "value": "..." }
+  apiRouter.put('/preferences/<key>', (Request request, String key) async {
+    try {
+      if (key.isEmpty || key.length > 100) {
+        return jsonResponse(400, {
+          'error': 'Invalid key: must be 1-100 characters',
+        });
+      }
+
+      final payload = await request.readAsString();
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+
+      if (!data.containsKey('value') || data['value'] == null) {
+        return jsonResponse(400, {
+          'error': 'Body must contain "value" field',
+        });
+      }
+
+      final value = data['value'].toString();
+      await preferencesDao.set(key, value);
+
+      return jsonResponse(200, {'key': key, 'value': value});
+    } catch (e, stackTrace) {
+      print('Error setting preference $key: $e\n$stackTrace');
+      return jsonResponse(500, {'error': 'Failed to set preference'});
     }
   });
 

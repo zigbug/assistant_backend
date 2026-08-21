@@ -46,19 +46,21 @@
 - [x] `PATCH /api/v1/projects/<id>/unarchive` — восстановление из архива.
 - [x] `DELETE /api/v1/projects/<id>` — удаление (запрещено если есть привязанные задачи, возвращает 409).
 
-### 2.4 Daily Plans API — Ближе к финальной цели (план на день)
+### 2.4 Preferences API ✅ ЗАВЕРШЕНО
+- [x] `GET /api/v1/preferences` — получение всех настроек как JSON-объект.
+- [x] `PATCH /api/v1/preferences` — пакетное обновление нескольких настроек.
+- [x] `GET /api/v1/preferences/<key>` — получение одной настройки по ключу.
+- [x] `PUT /api/v1/preferences/<key>` — создание/обновление одной настройки.
+
+### 2.5 Daily Plans API — Ближе к финальной цели (план на день)
 - [ ] `POST /api/v1/daily-plans/generate` — генерация плана на день (заглушка для будущего вызова из MCP/Qwen).
 - [ ] `GET /api/v1/daily-plans/today` — получение плана на сегодня.
 - [ ] `GET /api/v1/daily-plans/<date>` — получение плана на конкретную дату (UTC).
 - [ ] `PATCH /api/v1/daily-plans/items/<id>` — отметка выполнения блока плана.
 
-### 2.5 Events & Notes API — Позже
+### 2.6 Events & Notes API — Позже
 - [ ] CRUD для событий (`/api/v1/events`).
 - [ ] CRUD для заметок (`/api/v1/notes`) + promotion в задачу.
-
-### 2.6 Preferences API — Позже
-- [ ] `GET /api/v1/preferences` — получение всех настроек.
-- [ ] `PATCH /api/v1/preferences` — обновление настроек.
 
 ## Этап 3: Интеграция с MCP (Будущий этап)
 - [ ] Проектирование и документирование OpenAPI/Swagger спецификации.

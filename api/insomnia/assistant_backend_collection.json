@@ -10,7 +10,7 @@
       "modified": 1724198400000,
       "created": 1724198400000,
       "name": "Assistant Backend API",
-      "description": "HTTP API для бэкенда AI-ассистента (Tasks + Projects)",
+      "description": "HTTP API для бэкенда AI-ассистента (Tasks + Projects + Preferences)",
       "scope": "collection",
       "_type": "request_group"
     },
@@ -472,6 +472,98 @@
       ],
       "authentication": {},
       "metaSortKey": -1724198320000,
+      "_type": "request"
+    },
+    {
+      "_id": "grp_preferences",
+      "parentId": "wrk_assistant",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "name": "04. Preferences",
+      "description": "Настройки пользователя (key-value) — нужны AI для генерации плана дня",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1724198100000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "req_preferences_get_all",
+      "parentId": "grp_preferences",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/preferences",
+      "name": "Get all preferences",
+      "description": "Получить все настройки как JSON-объект",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198400000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_preferences_update_many",
+      "parentId": "grp_preferences",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/preferences",
+      "name": "Update multiple preferences",
+      "description": "Обновить несколько настроек одновременно",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"work_start\": \"08:30\",\n  \"peak_hours\": \"morning\",\n  \"timezone\": \"Europe/Moscow\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "x-api-key", "value": "{{ _.apiKey }}" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198390000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_preferences_get_one",
+      "parentId": "grp_preferences",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/preferences/timezone",
+      "name": "Get preference by key",
+      "description": "Получить одну настройку по ключу",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198380000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_preferences_set_one",
+      "parentId": "grp_preferences",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/preferences/work_start",
+      "name": "Set single preference",
+      "description": "Создать или обновить одну настройку",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"value\": \"09:00\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "x-api-key", "value": "{{ _.apiKey }}" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198370000,
       "_type": "request"
     }
   ]
