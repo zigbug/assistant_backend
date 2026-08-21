@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 /// Проекты — это «сферы жизни», к которым относятся задачи.
 /// Например: «Работа», «Пет-проекты», «Здоровье», «Учёба».
 /// Задача может быть привязана к проекту или существовать сама по себе.
+@DataClassName('Project')
 class Projects extends Table {
   /// Уникальный идентификатор проекта (автоинкремент).
   IntColumn get id => integer().autoIncrement()();
@@ -16,10 +17,8 @@ class Projects extends Table {
 
   /// Флаг архивации. Архивированные проекты не показываются в активных списках,
   /// но их данные и задачи сохраняются для истории.
-  BoolColumn get isArchived =>
-      boolean().withDefault(const Constant(false))();
+  BoolColumn get isArchived => boolean().withDefault(const Constant(false))();
 
   /// Дата и время создания проекта.
-  DateTimeColumn get createdAt =>
-      dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }

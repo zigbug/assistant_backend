@@ -1,0 +1,478 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-08-21T00:00:00.000Z",
+  "__export_source": "assistant_backend",
+  "resources": [
+    {
+      "_id": "wrk_assistant",
+      "parentId": null,
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "name": "Assistant Backend API",
+      "description": "HTTP API для бэкенда AI-ассистента (Tasks + Projects)",
+      "scope": "collection",
+      "_type": "request_group"
+    },
+    {
+      "_id": "env_base",
+      "parentId": "wrk_assistant",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "name": "Base Environment",
+      "data": {
+        "baseUrl": "http://localhost:8081",
+        "apiVersion": "v1",
+        "apiKey": "your-super-secret-api-key-123",
+        "taskId": "1",
+        "projectId": "1"
+      },
+      "dataPropertyOrder": null,
+      "color": null,
+      "isPrivate": false,
+      "metaSortKey": -1724198400000,
+      "_type": "environment"
+    },
+    {
+      "_id": "env_dev",
+      "parentId": "env_base",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "name": "Development (localhost)",
+      "data": {
+        "baseUrl": "http://localhost:8081"
+      },
+      "dataPropertyOrder": null,
+      "color": "#00ff00",
+      "isPrivate": false,
+      "metaSortKey": -1724198400000,
+      "_type": "environment"
+    },
+    {
+      "_id": "env_prod",
+      "parentId": "env_base",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "name": "Production (VPS)",
+      "data": {
+        "baseUrl": "https://your-vps-domain.com"
+      },
+      "dataPropertyOrder": null,
+      "color": "#ff0000",
+      "isPrivate": false,
+      "metaSortKey": -1724198300000,
+      "_type": "environment"
+    },
+    {
+      "_id": "grp_health",
+      "parentId": "wrk_assistant",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "name": "01. Health",
+      "description": "Эндпоинты мониторинга",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1724198400000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "grp_tasks",
+      "parentId": "wrk_assistant",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "name": "02. Tasks",
+      "description": "CRUD для задач",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1724198300000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "grp_projects",
+      "parentId": "wrk_assistant",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "name": "03. Projects",
+      "description": "CRUD для проектов (сферы жизни)",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1724198200000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "req_health",
+      "parentId": "grp_health",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/health",
+      "name": "Health check",
+      "description": "Проверка работоспособности сервера (без API-ключа)",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1724198400000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_tasks_list",
+      "parentId": "grp_tasks",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/tasks",
+      "name": "List active tasks",
+      "description": "Список активных задач",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198400000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_tasks_list_filtered",
+      "parentId": "grp_tasks",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/tasks",
+      "name": "Filter by status",
+      "description": "Фильтрация по статусу",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        { "name": "status", "value": "todo", "disabled": false }
+      ],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198390000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_tasks_list_by_project",
+      "parentId": "grp_tasks",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/tasks",
+      "name": "Filter by project",
+      "description": "Задачи конкретного проекта",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        { "name": "project_id", "value": "{{ _.projectId }}", "disabled": false }
+      ],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198380000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_tasks_overdue",
+      "parentId": "grp_tasks",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/tasks",
+      "name": "Overdue tasks",
+      "description": "Просроченные задачи",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        { "name": "overdue", "value": "true", "disabled": false }
+      ],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198370000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_tasks_scheduled",
+      "parentId": "grp_tasks",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/tasks",
+      "name": "Scheduled for date",
+      "description": "Задачи на конкретную дату",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        { "name": "scheduled", "value": "2026-08-21", "disabled": false }
+      ],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198360000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_tasks_get_one",
+      "parentId": "grp_tasks",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/tasks/{{ _.taskId }}",
+      "name": "Get task by ID",
+      "description": "Получение одной задачи",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198350000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_tasks_create",
+      "parentId": "grp_tasks",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/tasks",
+      "name": "Create task",
+      "description": "Создание новой задачи",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"title\": \"Новая задача\",\n  \"description\": \"Описание задачи\",\n  \"projectId\": {{ _.projectId }},\n  \"importance\": 3,\n  \"urgency\": 2,\n  \"estimatedMinutes\": 60\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "x-api-key", "value": "{{ _.apiKey }}" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198340000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_tasks_update",
+      "parentId": "grp_tasks",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/tasks/{{ _.taskId }}",
+      "name": "Update task",
+      "description": "Частичное обновление задачи",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"in_progress\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "x-api-key", "value": "{{ _.apiKey }}" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198330000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_tasks_delete",
+      "parentId": "grp_tasks",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/tasks/{{ _.taskId }}",
+      "name": "Delete task",
+      "description": "Удаление задачи",
+      "method": "DELETE",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198320000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_projects_list",
+      "parentId": "grp_projects",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/projects",
+      "name": "List active projects",
+      "description": "Список активных проектов",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198400000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_projects_list_all",
+      "parentId": "grp_projects",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/projects",
+      "name": "List all (with archived)",
+      "description": "Все проекты включая архивные",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        { "name": "include_archived", "value": "true", "disabled": false }
+      ],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198390000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_projects_list_archived",
+      "parentId": "grp_projects",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/projects",
+      "name": "List archived only",
+      "description": "Только архивированные проекты",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        { "name": "archived", "value": "true", "disabled": false }
+      ],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198380000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_projects_create",
+      "parentId": "grp_projects",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/projects",
+      "name": "Create project",
+      "description": "Создание нового проекта",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Пет-проекты\",\n  \"color\": \"#3498DB\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "x-api-key", "value": "{{ _.apiKey }}" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198370000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_projects_get_one",
+      "parentId": "grp_projects",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/projects/{{ _.projectId }}",
+      "name": "Get project by ID",
+      "description": "Проект со статистикой задач",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198360000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_projects_update",
+      "parentId": "grp_projects",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/projects/{{ _.projectId }}",
+      "name": "Update project",
+      "description": "Обновление имени или цвета",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Пет-проекты (обновлённый)\",\n  \"color\": \"#E74C3C\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "x-api-key", "value": "{{ _.apiKey }}" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198350000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_projects_archive",
+      "parentId": "grp_projects",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/projects/{{ _.projectId }}/archive",
+      "name": "Archive project",
+      "description": "Архивирование проекта",
+      "method": "PATCH",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198340000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_projects_unarchive",
+      "parentId": "grp_projects",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/projects/{{ _.projectId }}/unarchive",
+      "name": "Unarchive project",
+      "description": "Восстановление из архива",
+      "method": "PATCH",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198330000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_projects_delete",
+      "parentId": "grp_projects",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/projects/{{ _.projectId }}",
+      "name": "Delete project",
+      "description": "Удаление проекта (запрещено при наличии задач)",
+      "method": "DELETE",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198320000,
+      "_type": "request"
+    }
+  ]
+}
