@@ -42,15 +42,23 @@ class DailyPlansDao extends DatabaseAccessor<AppDatabase>
         .getSingleOrNull();
   }
 
-  /// Добавить элемент в план
+  /// Добавить элемент в план (задачу, событие, перерыв).
+  ///
+  /// [startTime] — время начала (обязательно).
+  /// [endTime] — время окончания (опционально). Для событий на весь день
+  /// или задач без оценки времени можно передавать null.
+  ///
+  /// [status] по умолчанию — `planned`, т.к. только что добавленный элемент
+  /// ещё не начал выполняться. В `inProgress` его переведёт пользователь
+  /// через Flutter-приложение, когда нажмёт "Начать".
   Future<int> addItem({
     required int planId,
     required PlanItemType itemType,
     int? refId,
     required DateTime startTime,
-    required DateTime endTime,
-    PlanItemStatus status = PlanItemStatus.planned,
+    DateTime? endTime,
     String? note,
+    PlanItemStatus status = PlanItemStatus.planned, // ← planned вместо pending
   }) async {
     return await into(dailyPlanItems).insert(
       DailyPlanItemsCompanion.insert(
@@ -59,8 +67,8 @@ class DailyPlansDao extends DatabaseAccessor<AppDatabase>
         refId: Value(refId),
         startTime: startTime,
         endTime: Value(endTime),
-        status: Value(status),
         note: Value(note),
+        status: Value(status),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 /// Типы повторения событий.
+/// Enum маппится в БД как строка через textEnum<Recurrence>().
 enum Recurrence {
   none,      // Без повторений
   daily,     // Каждый день
@@ -12,6 +13,10 @@ enum Recurrence {
 /// События и важные даты.
 /// В отличие от задач, событие — это что-то, что происходит во времени
 /// (встреча, созвон, день рождения). Его нельзя «выполнить», можно только пропустить.
+///
+/// Аннотация DataClassName генерирует модель Event с методом toJson(),
+/// который используется в HTTP API для сериализации в JSON.
+@DataClassName('Event', useJson: true)
 class Events extends Table {
   IntColumn get id => integer().autoIncrement()();
 

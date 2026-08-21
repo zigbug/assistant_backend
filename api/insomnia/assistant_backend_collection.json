@@ -10,7 +10,7 @@
       "modified": 1724198400000,
       "created": 1724198400000,
       "name": "Assistant Backend API",
-      "description": "HTTP API для бэкенда AI-ассистента (Tasks + Projects + Preferences)",
+      "description": "HTTP API для бэкенда AI-ассистента (Tasks + Projects + Preferences + Events + Daily Plans)",
       "scope": "collection",
       "_type": "request_group"
     },
@@ -25,7 +25,11 @@
         "apiVersion": "v1",
         "apiKey": "your-super-secret-api-key-123",
         "taskId": "1",
-        "projectId": "1"
+        "projectId": "1",
+        "eventId": "1",
+        "planId": "1",
+        "planItemId": "1",
+        "planDate": "2026-08-21"
       },
       "dataPropertyOrder": null,
       "color": null,
@@ -97,6 +101,42 @@
       "environment": {},
       "environmentPropertyOrder": null,
       "metaSortKey": -1724198200000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "grp_preferences",
+      "parentId": "wrk_assistant",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "name": "04. Preferences",
+      "description": "Настройки пользователя (key-value) — нужны AI для генерации плана дня",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1724198100000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "grp_events",
+      "parentId": "wrk_assistant",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "name": "05. Events",
+      "description": "CRUD для событий (встречи, созвоны, жёсткие блоки времени)",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1724198000000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "grp_daily_plans",
+      "parentId": "wrk_assistant",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "name": "06. Daily Plans",
+      "description": "Планы дня — центральная фича ассистента (генерация, просмотр, управление элементами)",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1724197900000,
       "_type": "request_group"
     },
     {
@@ -475,18 +515,6 @@
       "_type": "request"
     },
     {
-      "_id": "grp_preferences",
-      "parentId": "wrk_assistant",
-      "modified": 1724198400000,
-      "created": 1724198400000,
-      "name": "04. Preferences",
-      "description": "Настройки пользователя (key-value) — нужны AI для генерации плана дня",
-      "environment": {},
-      "environmentPropertyOrder": null,
-      "metaSortKey": -1724198100000,
-      "_type": "request_group"
-    },
-    {
       "_id": "req_preferences_get_all",
       "parentId": "grp_preferences",
       "modified": 1724198400000,
@@ -564,6 +592,509 @@
       ],
       "authentication": {},
       "metaSortKey": -1724198370000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_events_upcoming",
+      "parentId": "grp_events",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/events",
+      "name": "Upcoming events (default)",
+      "description": "События на ближайшие 7 дней (по умолчанию)",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198400000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_events_today",
+      "parentId": "grp_events",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/events",
+      "name": "Today's events",
+      "description": "Только события на сегодня",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        { "name": "filter", "value": "today", "disabled": false }
+      ],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198390000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_events_upcoming_14",
+      "parentId": "grp_events",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/events",
+      "name": "Upcoming 14 days",
+      "description": "События на ближайшие 14 дней",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        { "name": "filter", "value": "upcoming", "disabled": false },
+        { "name": "days", "value": "14", "disabled": false }
+      ],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198380000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_events_all",
+      "parentId": "grp_events",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/events",
+      "name": "All events (sync)",
+      "description": "Все события для синхронизации",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        { "name": "filter", "value": "all", "disabled": false }
+      ],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198370000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_events_get_one",
+      "parentId": "grp_events",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/events/{{ _.eventId }}",
+      "name": "Get event by ID",
+      "description": "Получение одного события",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198360000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_events_create",
+      "parentId": "grp_events",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/events",
+      "name": "Create event",
+      "description": "Создание нового события",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"title\": \"Созвон с командой\",\n  \"startsAt\": \"2026-08-25T14:00:00Z\",\n  \"isAllDay\": false,\n  \"recurrence\": \"weekly\",\n  \"remindMinutesBefore\": 15,\n  \"location\": \"Zoom\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "x-api-key", "value": "{{ _.apiKey }}" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198350000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_events_create_allday",
+      "parentId": "grp_events",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/events",
+      "name": "Create all-day event",
+      "description": "Создание события на весь день (например, день рождения)",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"title\": \"День рождения Анны\",\n  \"startsAt\": \"2026-09-15T00:00:00Z\",\n  \"isAllDay\": true,\n  \"recurrence\": \"yearly\",\n  \"remindMinutesBefore\": 1440\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "x-api-key", "value": "{{ _.apiKey }}" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198340000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_events_update",
+      "parentId": "grp_events",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/events/{{ _.eventId }}",
+      "name": "Update event",
+      "description": "Частичное обновление события",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"title\": \"Созвон с командой (перенесён)\",\n  \"startsAt\": \"2026-08-26T15:00:00Z\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "x-api-key", "value": "{{ _.apiKey }}" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198330000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_events_delete",
+      "parentId": "grp_events",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/events/{{ _.eventId }}",
+      "name": "Delete event",
+      "description": "Удаление события",
+      "method": "DELETE",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198320000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_plans_generate_today",
+      "parentId": "grp_daily_plans",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/daily-plans/generate",
+      "name": "Generate plan for today",
+      "description": "Генерация плана на сегодня (базовая эвристика: события + scheduled-задачи + просроченные)",
+      "method": "POST",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198400000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_plans_generate_date",
+      "parentId": "grp_daily_plans",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/daily-plans/generate",
+      "name": "Generate plan for specific date",
+      "description": "Генерация плана на указанную дату",
+      "method": "POST",
+      "body": {},
+      "parameters": [
+        { "name": "date", "value": "{{ _.planDate }}", "disabled": false }
+      ],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198390000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_plans_today",
+      "parentId": "grp_daily_plans",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/daily-plans/today",
+      "name": "Get today's plan",
+      "description": "Получение плана на сегодня (404 если плана ещё нет)",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198380000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_plans_by_date",
+      "parentId": "grp_daily_plans",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/daily-plans/{{ _.planDate }}",
+      "name": "Get plan by date",
+      "description": "Получение плана на конкретную дату (формат YYYY-MM-DD, UTC)",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198370000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_plans_by_id",
+      "parentId": "grp_daily_plans",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/daily-plans/id/{{ _.planId }}",
+      "name": "Get plan by ID",
+      "description": "Получение плана по его ID (вместе со всеми элементами)",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198360000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_plans_stats",
+      "parentId": "grp_daily_plans",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/daily-plans/{{ _.planId }}/stats",
+      "name": "Get plan stats",
+      "description": "Получение агрегированной статистики по плану дня (количество по статусам, % выполнения, оценённое и затраченное время)",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198355000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_plans_confirm",
+      "parentId": "grp_daily_plans",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/daily-plans/{{ _.planId }}",
+      "name": "Confirm plan",
+      "description": "Подтверждение плана пользователем (draft -> confirmed)",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"confirmed\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "x-api-key", "value": "{{ _.apiKey }}" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198350000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_plans_mark_done",
+      "parentId": "grp_daily_plans",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/daily-plans/{{ _.planId }}",
+      "name": "Mark day as done",
+      "description": "Отметить день как завершённый (для анализа AI Lessons)",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"done\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "x-api-key", "value": "{{ _.apiKey }}" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198340000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_plans_add_ai_comment",
+      "parentId": "grp_daily_plans",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/daily-plans/{{ _.planId }}",
+      "name": "Add AI comment",
+      "description": "Добавить комментарий/совет от AI к плану",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"aiComment\": \"План выглядит хорошо, но рекомендую сделать сложные задачи утром, пока пиковая продуктивность. После обеда — рутина.\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "x-api-key", "value": "{{ _.apiKey }}" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198330000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_plans_delete",
+      "parentId": "grp_daily_plans",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/daily-plans/{{ _.planId }}",
+      "name": "Delete plan",
+      "description": "Удалить план и все его элементы (каскадно)",
+      "method": "DELETE",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198320000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_plans_add_break",
+      "parentId": "grp_daily_plans",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/daily-plans/{{ _.planId }}/items",
+      "name": "Add break slot",
+      "description": "Добавить перерыв в план вручную",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"itemType\": \"breakSlot\",\n  \"startTime\": \"2026-08-21T13:00:00Z\",\n  \"endTime\": \"2026-08-21T14:00:00Z\",\n  \"note\": \"Обед\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "x-api-key", "value": "{{ _.apiKey }}" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198310000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_plans_add_task_item",
+      "parentId": "grp_daily_plans",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/daily-plans/{{ _.planId }}/items",
+      "name": "Add task to plan manually",
+      "description": "Привязать существующую задачу к плану на определённое время",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"itemType\": \"task\",\n  \"refId\": {{ _.taskId }},\n  \"startTime\": \"2026-08-21T10:00:00Z\",\n  \"endTime\": \"2026-08-21T11:00:00Z\",\n  \"note\": \"Ручное планирование\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "x-api-key", "value": "{{ _.apiKey }}" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198300000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_plans_item_mark_done",
+      "parentId": "grp_daily_plans",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/daily-plans/items/{{ _.planItemId }}",
+      "name": "Mark item as done",
+      "description": "Отметить блок плана как выполненный",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"done\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "x-api-key", "value": "{{ _.apiKey }}" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198290000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_plans_item_skip",
+      "parentId": "grp_daily_plans",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/daily-plans/items/{{ _.planItemId }}",
+      "name": "Skip item with reason",
+      "description": "Пропустить блок с указанием причины (для анализа AI)",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"skipped\",\n  \"note\": \"Клиент позвонил, пришлось отложить\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "x-api-key", "value": "{{ _.apiKey }}" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198280000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_plans_item_reschedule",
+      "parentId": "grp_daily_plans",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/daily-plans/items/{{ _.planItemId }}",
+      "name": "Reschedule item",
+      "description": "Перенести блок на другое время (в пределах дня)",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"startTime\": \"2026-08-21T16:00:00Z\",\n  \"endTime\": \"2026-08-21T17:00:00Z\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "x-api-key", "value": "{{ _.apiKey }}" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198270000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_plans_item_delete",
+      "parentId": "grp_daily_plans",
+      "modified": 1724198400000,
+      "created": 1724198400000,
+      "url": "{{ _.baseUrl }}/api/{{ _.apiVersion }}/daily-plans/items/{{ _.planItemId }}",
+      "name": "Delete item",
+      "description": "Удалить элемент из плана",
+      "method": "DELETE",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        { "name": "x-api-key", "value": "{{ _.apiKey }}", "disabled": false }
+      ],
+      "authentication": {},
+      "metaSortKey": -1724198260000,
       "_type": "request"
     }
   ]

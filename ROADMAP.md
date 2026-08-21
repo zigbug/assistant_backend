@@ -52,15 +52,30 @@
 - [x] `GET /api/v1/preferences/<key>` — получение одной настройки по ключу.
 - [x] `PUT /api/v1/preferences/<key>` — создание/обновление одной настройки.
 
-### 2.5 Daily Plans API — Ближе к финальной цели (план на день)
-- [ ] `POST /api/v1/daily-plans/generate` — генерация плана на день (заглушка для будущего вызова из MCP/Qwen).
-- [ ] `GET /api/v1/daily-plans/today` — получение плана на сегодня.
-- [ ] `GET /api/v1/daily-plans/<date>` — получение плана на конкретную дату (UTC).
-- [ ] `PATCH /api/v1/daily-plans/items/<id>` — отметка выполнения блока плана.
+### 2.5 Events API ✅ ЗАВЕРШЕНО
+События — жёсткие блоки времени (встречи, созвоны, дни рождения). Нужны, чтобы AI не ставил задачи во время уже запланированных встреч.
+- [x] `GET /api/v1/events` — список событий с фильтрацией (`?filter=today|upcoming|all`, `?days=N`).
+- [x] `POST /api/v1/events` — создание события (с валидацией ISO 8601 даты и enum recurrence).
+- [x] `GET /api/v1/events/<id>` — получение одного события.
+- [x] `PATCH /api/v1/events/<id>` — частичное обновление события.
+- [x] `DELETE /api/v1/events/<id>` — удаление события.
 
-### 2.6 Events & Notes API — Позже
-- [ ] CRUD для событий (`/api/v1/events`).
-- [ ] CRUD для заметок (`/api/v1/notes`) + promotion в задачу.
+### 2.6 Daily Plans API ✅ ЗАВЕРШЕНО
+Планы дня — центральная фича ассистента. Генерация, просмотр и управление элементами.
+- [x] `POST /api/v1/daily-plans/generate?date=YYYY-MM-DD` — генерация плана (идемпотентная, с базовой эвристикой: события + scheduled-задачи + просроченные).
+- [x] `GET /api/v1/daily-plans/today` — получение плана на сегодня.
+- [x] `GET /api/v1/daily-plans/<date>` — получение плана на конкретную дату (UTC).
+- [x] `GET /api/v1/daily-plans/id/<id>` — получение плана по ID (для MCP с сохранённым контекстом).
+- [x] `PATCH /api/v1/daily-plans/<id>` — обновление метаданных плана (status: draft/confirmed/done, aiComment).
+- [x] `DELETE /api/v1/daily-plans/<id>` — удаление плана и всех элементов (каскадно).
+- [x] `POST /api/v1/daily-plans/<id>/items` — добавление элемента вручную (task/event/breakSlot/habit).
+- [x] `PATCH /api/v1/daily-plans/items/<id>` — обновление элемента (status, reschedule, note).
+- [x] `DELETE /api/v1/daily-plans/items/<id>` — удаление элемента.
+
+### 2.7 Notes API — Быстрые заметки
+- [ ] CRUD для заметок (`/api/v1/notes`).
+- [ ] Promotion заметки в задачу (`POST /api/v1/notes/<id>/promote`).
+- [ ] Фильтрация по тегам и статусу (inbox, archived).
 
 ## Этап 3: Интеграция с MCP (Будущий этап)
 - [ ] Проектирование и документирование OpenAPI/Swagger спецификации.

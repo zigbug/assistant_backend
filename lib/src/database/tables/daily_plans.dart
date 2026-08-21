@@ -8,8 +8,12 @@ enum PlanStatus {
 }
 
 /// План дня — контейнер для списка задач/событий на конкретный день.
-/// AI генерирует план через эндпоинт /api/v1/plans/generate,
+/// AI генерирует план через эндпоинт /api/v1/daily-plans/generate,
 /// учитывая задачи с scheduledDate, события, привычки и preferences.
+///
+/// Аннотация @DataClassName с useJson: true заставляет Drift сгенерировать
+/// метод toJson() для модели DailyPlan, что удобно для отправки через API.
+@DataClassName('DailyPlan', useJson: true)
 class DailyPlans extends Table {
   IntColumn get id => integer().autoIncrement()();
 

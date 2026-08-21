@@ -3,22 +3,26 @@ import 'daily_plans.dart';
 
 /// Типы элементов плана дня.
 enum PlanItemType {
-  task,       // Ссылка на задачу (ref_id → tasks.id)
-  event,      // Ссылка на событие (ref_id → events.id)
-  habit,      // Привычка (в v2 — отдельная таблица)
-  breakSlot,  // Перерыв/обед (без ссылки)
+  task, // Ссылка на задачу (ref_id → tasks.id)
+  event, // Ссылка на событие (ref_id → events.id)
+  habit, // Привычка (в v2 — отдельная таблица)
+  breakSlot, // Перерыв/обед (без ссылки)
 }
 
 /// Статусы элемента плана.
 enum PlanItemStatus {
-  planned,  // Запланировано
-  done,     // Сделано в отведённое время
-  skipped,  // Пропущено
-  moved,    // Перенесено на другой день/слот
+  planned, // 📋 В плане, время ещё не пришло
+  inProgress, // ▶️ Выполняется прямо сейчас (пользователь нажал "начать")
+  done, // ✅ Сделано в отведённое время
+  skipped, // ⏭️ Пропущено
+  moved, // 📅 Перенесено на другой день/слот
+  cancelled, // ❌ Отменено (не путать со skipped — отменено до начала)
 }
 
 /// Отдельный слот плана дня (time blocking).
 /// Каждый элемент — это отрезок времени с привязкой к задаче/событию/привычке.
+///
+@DataClassName('DailyPlanItem')
 class DailyPlanItems extends Table {
   IntColumn get id => integer().autoIncrement()();
 
@@ -41,8 +45,8 @@ class DailyPlanItems extends Table {
 
   /// Статус элемента плана (см. PlanItemStatus).
   // Constant принимает SQL-значение (строку), а не Dart-enum.
-  TextColumn get status => textEnum<PlanItemStatus>()
-      .withDefault(const Constant('planned'))();
+  TextColumn get status =>
+      textEnum<PlanItemStatus>().withDefault(const Constant('planned'))();
 
   /// Заметка/комментарий к слоту (например «отложили, потому что пришёл клиент»).
   TextColumn get note => text().nullable()();

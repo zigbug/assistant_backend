@@ -84,7 +84,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Версия схемы. При изменении таблиц — увеличиваем и реализуем migration.
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   /// Стратегия миграций по умолчанию — пересоздавать базу при изменении схемы.
   /// Для production это опасно — нужно будет написать onUpgrade вручную.
@@ -96,9 +96,14 @@ class AppDatabase extends _$AppDatabase {
         await m.createAll();
       },
       onUpgrade: (Migrator m, int from, int to) async {
-        // TODO(Denis): при увеличении schemaVersion написать миграции здесь.
-        // Например:
-        //   if (from < 2) { await m.addColumn(tasks, tasks.newColumn); }
+        // v2 (21 августа 2026): Добавлены статусы inProgress и cancelled
+        // в enum PlanItemStatus. Поскольку enum хранится как textEnum,
+        // существующие записи не требуют миграции — новые значения
+        // становятся доступны автоматически.
+        if (from < 2) {
+          // Пустая миграция — фиксируем версию в истории.
+          // В будущем здесь могут появиться реальные ALTER TABLE.
+        }
       },
       beforeOpen: (details) async {
         // Опциональные действия перед открытием (например включить WAL для SQLite).
