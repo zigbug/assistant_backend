@@ -45,30 +45,31 @@ jobs:
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/assistant/
 
       - name: 🚀 Deploy via docker compose
-        env:
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          API_KEY: ${{ secrets.API_KEY }}
-          MCP_SECRET_PATH: ${{ secrets.MCP_SECRET_PATH }}
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DEPLOY_EOF'
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << DEPLOY_EOF
             set -e
             cd /opt/assistant
             
-            # Создаём .env из переменных окружения (idempotent)
-            cat > .env << ENV_EOF
-            POSTGRES_PASSWORD=$POSTGRES_PASSWORD
-            API_KEY=$API_KEY
-            MCP_SECRET_PATH=$MCP_SECRET_PATH
+            # Создаём .env файл (внешний heredoc без кавычек раскрывает переменные из env:)
+            cat > .env << 'ENV_EOF'
+            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+            API_KEY=${API_KEY}
+            MCP_SECRET_PATH=${MCP_SECRET_PATH}
             ENV_EOF
+            
             chmod 600 .env
             
             # Поднимаем стек
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
             
             # Ждём старта БД и показываем статус
-            sleep 5
+            sleep 10
             docker compose -f docker-compose.prod.yml ps
           DEPLOY_EOF
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          API_KEY: ${{ secrets.API_KEY }}
+          MCP_SECRET_PATH: ${{ secrets.MCP_SECRET_PATH }}
 
       - name: ✅ Health check
         run: |
