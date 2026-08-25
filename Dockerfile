@@ -12,11 +12,6 @@ RUN dart pub get
 # 2. Копируем весь исходный код
 COPY . .
 
-# 3. Создаем пользователя для безопасности и передаем ему права
-RUN useradd -r -u 10001 appuser && \
-    chown -R appuser:appuser /app
-
-USER appuser
 EXPOSE 8081
 
 # 4. Запускаем напрямую через dart run
