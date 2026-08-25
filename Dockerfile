@@ -17,11 +17,20 @@ RUN groupadd --system app \
 COPY pubspec.* ./
 RUN dart pub get
 
-# 2. Копируем исходный код и отдаём владение пользователю app.
+# 2. Копируем исходный код
+COPY . .
+
+# 3. Генерируем Drift/json-код (*.g.dart).
+# В git эти файлы не хранятся (.gitignore), поэтому без этого шага
+# сборка из чистого чекаута падает с ошибками компиляции.
+RUN dart run build_runner build --delete-conflicting-outputs
+
+# Отдаём владение пользователю app.
 # /app/data создаём заранее: пустой named volume при первом монтировании
 # наследует владельца каталога из образа.
-COPY . .
+# Кэш build_runner в образе не нужен — удаляем для компактности.
 RUN mkdir -p /app/data \
+    && rm -rf .dart_tool/build \
     && chown -R app:app /app
 
 USER app
