@@ -11,7 +11,7 @@ COPY . .
 RUN SQLITE3_SKIP_DOWNLOAD=1 dart compile exe bin/server.dart -o /out/server
 
 # --- Stage 2: Runtime ---
-FROM debian:bookworm-sFC
+FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates libsqlite3-0 \
     && rm -rf /var/lib/apt/lists/*
