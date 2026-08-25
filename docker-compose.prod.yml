@@ -1,0 +1,49 @@
+# Продакшен-стек для VPS.
+# Запуск:  docker compose -f docker-compose.prod.yml --env-file .env up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: assistant
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: assistant
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U assistant -d assistant" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    image: assistant-backend:latest
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://assistant:${POSTGRES_PASSWORD}@postgres:5432/assistant
+      API_KEY: ${API_KEY}
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: "8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8081:8081"
+
+  mcp:
+    image: assistant-mcp:latest
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://backend:8081/api/v1
+      API_KEY: ${API_KEY}
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "8082"
+      MCP_PATH: ${MCP_SECRET_PATH}
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:8082:8082"
+
+volumes:
+  pgdata:
