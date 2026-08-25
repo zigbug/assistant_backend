@@ -46,11 +46,10 @@ jobs:
 
       - name:  Deploy via docker compose
         env:
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           API_KEY: ${{ secrets.API_KEY }}
           MCP_SECRET_PATH: ${{ secrets.MCP_SECRET_PATH }}
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd /opt/assistant && echo 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD}' > .env && echo 'API_KEY=${API_KEY}' >> .env && echo 'MCP_SECRET_PATH=${MCP_SECRET_PATH}' >> .env && chmod 600 .env && docker compose -f docker-compose.prod.yml up -d --remove-orphans && sleep 10 && docker compose -f docker-compose.prod.yml ps"
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd /opt/assistant && echo 'API_KEY=${API_KEY}' > .env && echo 'MCP_SECRET_PATH=${MCP_SECRET_PATH}' >> .env && chmod 600 .env && docker compose -f docker-compose.prod.yml up -d --remove-orphans && sleep 10 && docker compose -f docker-compose.prod.yml ps"
 
       - name: ✅ Health check
         run: |

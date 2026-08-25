@@ -1633,6 +1633,7 @@ Future<void> main(List<String> args) async {
   print('  Health check: http://localhost:${server.port}/health');
   print(
       '  API Base: http://localhost:${server.port}/api/${AppConstants.apiVersion}/');
-  print('  Use header: x-api-key: ${AppConstants.apiKey}');
+  // API-ключ намеренно не печатаем — он утёк бы в docker logs.
+  print('  Auth: заголовок x-api-key (значение в переменной API_KEY)');
   print('==================================================');
 }

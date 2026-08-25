@@ -144,10 +144,20 @@ class AppDatabase extends _$AppDatabase {
 
 /// Возвращает директорию для хранения данных приложения (кроссплатформенно).
 ///
+/// Если задана переменная окружения `DATA_DIR` — используется она.
+/// Это основной способ указать путь в Docker (см. docker-compose.prod.yml).
+///
+/// Иначе путь выбирается по платформе:
 /// - Windows: `%APPDATA%/assistant_backend` (например, `C:\Users\Denis\AppData\Roaming\assistant_backend`)
 /// - Linux: `$HOME/.local/share/assistant_backend`
 /// - macOS: `$HOME/Library/Application Support/assistant_backend`
 Directory _getDataDirectory() {
+  // Явное переопределение пути через окружение (Docker и тесты).
+  final dataDirOverride = Platform.environment['DATA_DIR'];
+  if (dataDirOverride != null && dataDirOverride.isNotEmpty) {
+    return Directory(dataDirOverride);
+  }
+
   final String homePath;
 
   if (Platform.isWindows) {
