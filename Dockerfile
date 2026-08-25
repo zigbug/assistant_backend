@@ -1,25 +1,24 @@
-# --- Stage 1: Build ---
-FROM dart:stable AS build
+# Используем полноценный Dart SDK. 
+# Это надежнее, чем AOT-компиляция, так как обходит проблемы 
+# с build hooks пакета sqlite3 в Docker-среде.
+FROM dart:stable
+
 WORKDIR /app
 
+# 1. Копируем манифесты и получаем зависимости (этот слой будет закэширован)
 COPY pubspec.* ./
 RUN dart pub get
 
+# 2. Копируем весь исходный код
 COPY . .
 
-# ⭐ ВАЖНО: SQLITE3_SKIP_DOWNLOAD=1 предотвращает ошибку build hooks
-RUN SQLITE3_SKIP_DOWNLOAD=1 dart compile exe bin/server.dart -o /out/server
+# 3. Создаем пользователя для безопасности и передаем ему права
+RUN useradd -r -u 10001 appuser && \
+    chown -R appuser:appuser /app
 
-# --- Stage 2: Runtime ---
-FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates libsqlite3-0 \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN useradd -r -u 10001 appuser
-
-COPY --from=build /out/server /usr/local/bin/server
 USER appuser
 EXPOSE 8081
 
-ENTRYPOINT ["server"]
+# 4. Запускаем напрямую через dart run
+# (Старт занимает ~1-2 сек, что отлично для бэкенда)
+ENTRYPOINT ["dart", "run", "bin/server.dart"]
