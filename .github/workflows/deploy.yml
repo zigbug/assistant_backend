@@ -44,7 +44,7 @@ jobs:
           scp -i ~/.ssh/deploy_key docker-compose.prod.yml \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/assistant/
 
-      - name:  Deploy via docker compose
+      - name: 🐋 Deploy via docker compose
         env:
           API_KEY: ${{ secrets.API_KEY }}
           MCP_SECRET_PATH: ${{ secrets.MCP_SECRET_PATH }}
