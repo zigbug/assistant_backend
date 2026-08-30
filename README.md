@@ -20,11 +20,14 @@ assistant_backend/
 │   └── src/
 │       ├── config/
 │       │   └── constants.dart   # Конфигурация из переменных окружения
-│       └── database/
-│           ├── database.dart    # Схема Drift, миграции, фабрика БД
-│           ├── connection.dart  # Заготовка подключения к PostgreSQL (v2)
-│           ├── tables/          # Описание таблиц
-│           └── daos/            # DAO для каждой сущности
+│       ├── database/
+│       │   ├── database.dart    # Схема Drift, миграции, фабрика БД
+│       │   ├── connection.dart  # Заготовка подключения к PostgreSQL (v2)
+│       │   ├── tables/          # Описание таблиц
+│       │   └── daos/            # DAO для каждой сущности
+│       └── services/
+│           ├── recurring_task_materializer.dart  # Планировщик повторяющихся задач
+│           └── time_context.dart                 # Контекст времени для AI/MCP
 ├── test/
 ├── Dockerfile
 └── docker-compose.prod.yml
@@ -73,11 +76,32 @@ curl -H "x-api-key: $API_KEY" http://localhost:8081/api/v1/tasks
 ## API Endpoints
 
 ### Задачи
-- `GET /api/v1/tasks` — список задач (`?status=`, `?project_id=`, `?overdue=true`, `?scheduled=YYYY-MM-DD`)
-- `POST /api/v1/tasks` — создать задачу
+- `GET /api/v1/tasks` — список задач (`?status=`, `?project_id=`, `?overdue=true`, `?scheduled=YYYY-MM-DD`, `?include_templates=true`)
+- `POST /api/v1/tasks` — создать задачу (поддерживает поля повторяемости, см. ниже)
 - `GET /api/v1/tasks/{id}` — получить задачу
 - `PATCH /api/v1/tasks/{id}` — обновить задачу
 - `DELETE /api/v1/tasks/{id}` — удалить задачу
+
+**Повторяемость задач** (`recurrence`): `none|daily|weekly|monthly|yearly`.
+- Задача с `recurrence != none` является «шаблоном» серии. Планировщик на сервере
+  заранее материализует из неё конкретные экземпляры (задачи с `parentId` → шаблон)
+  на 30 дней вперёд начиная с сегодняшнего дня.
+- Экземпляры — обычные задачи: выполняются, переносятся и удаляются независимо.
+- Каждый шаблон повторно обрабатывается при создании/обновлении через API и каждые
+  6 часов автоматически (создание идемпотентно — даты не дублируются).
+- Чтобы остановить серию, переведите шаблон в `done` или `cancelled`, либо
+  сбросьте `recurrence` в `none`.
+- По умолчанию шаблоны скрыты из списка задач (показываются только экземпляры);
+  чтобы увидеть их, передайте `?include_templates=true`.
+- Поля серии: `recurrence`, `repeatInterval` (каждые N дней/недель/месяцев/лет, ≥ 1),
+  `repeatEndDate` (до какой даты, ISO 8601, опционально), `parentId` (ссылка на шаблон).
+
+### Время для AI/MCP
+- `GET /api/v1/time` — текущее время сервера: `serverTimeUtc`, `serverTimeLocal`,
+  `timezone` (из Preferences, по умолчанию `Europe/Moscow`) и `utcOffsetMinutes`.
+- В каждый объектный JSON-ответ автоматически встраивается поле `serverTimeUtc`,
+  чтобы AI понимал, в каком моменте времени находится система (для списков —
+  заголовок `X-Server-Time-Utc`).
 
 ### Проекты
 - `GET /api/v1/projects` — активные проекты (`?archived=true`, `?include_archived=true`)

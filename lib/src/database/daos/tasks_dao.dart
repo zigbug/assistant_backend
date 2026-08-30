@@ -9,14 +9,16 @@ part 'tasks_dao.g.dart';
 class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   TasksDao(super.db);
 
-  /// Получить все активные задачи (не done, не cancelled)
-  Future<List<Task>> getActive() async {
+  /// Получить все активные задачи (не done, не cancelled).
+  ///
+  /// Шаблоны повторяющихся задач по умолчанию скрыты — вместо них в списке
+  /// фигурируют материализованные экземпляры. Передайте
+  /// [includeTemplates] = true, чтобы увидеть сам шаблон серии
+  /// (например для редактирования частоты повторения).
+  Future<List<Task>> getActive({bool includeTemplates = false}) async {
     return await (select(tasks)
-          ..where((t) =>
-              t.status.equals(TaskStatus.backlog.name) |
-              t.status.equals(TaskStatus.todo.name) |
-              t.status.equals(TaskStatus.inProgress.name) |
-              t.status.equals(TaskStatus.waiting.name)))
+          ..where((t) => _activeStatuses(t) &
+              _templateFilters(t, includeTemplates)))
         .get();
   }
 
@@ -26,20 +28,21 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     return await (select(tasks)
           ..where((t) =>
               t.deadline.isSmallerThanValue(now) &
-              (t.status.equals(TaskStatus.todo.name) |
-                  t.status.equals(TaskStatus.inProgress.name) |
-                  t.status.equals(TaskStatus.backlog.name))))
+              _activeStatuses(t) &
+              _templateFilters(t, false)))
         .get();
   }
 
-  /// Получить задачи запланированные на конкретную дату
+  /// Получить задачи запланированные на конкретную дату.
+  /// Шаблоны серий исключаются (их место занимают экземпляры).
   Future<List<Task>> getScheduledForDate(DateTime date) async {
     final start = DateTime(date.year, date.month, date.day);
     final end = start.add(const Duration(days: 1));
     return await (select(tasks)
           ..where((t) =>
               t.scheduledDate.isBiggerOrEqualValue(start) &
-              t.scheduledDate.isSmallerThanValue(end)))
+              t.scheduledDate.isSmallerThanValue(end) &
+              _templateFilters(t, false)))
         .get();
   }
 
@@ -79,6 +82,26 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         .getSingleOrNull();
   }
 
+  /// Все активные «шаблоны» повторяющихся задач (recurrence != none).
+  /// Готовые/отменённые шаблоны не возвращаются — серия считается завершённой,
+  /// материализатор перестаёт создавать новые экземпляры.
+  Future<List<Task>> getRecurringTemplates() async {
+    return await (select(tasks)
+          ..where((t) =>
+              (t.status.equals(TaskStatus.backlog.name) |
+                  t.status.equals(TaskStatus.todo.name) |
+                  t.status.equals(TaskStatus.inProgress.name) |
+                  t.status.equals(TaskStatus.waiting.name)) &
+              t.recurrence.isNotValue(TaskRecurrence.none.name)))
+        .get();
+  }
+
+  /// Экземпляры заданного шаблона серии (parentId == templateId).
+  Future<List<Task>> getChildrenOf(int templateId) async {
+    return await (select(tasks)..where((t) => t.parentId.equals(templateId)))
+        .get();
+  }
+
   /// Создать новую задачу
   Future<int> create({
     required String title,
@@ -90,6 +113,10 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     DateTime? deadline,
     DateTime? scheduledDate,
     int? estimatedMinutes,
+    TaskRecurrence recurrence = TaskRecurrence.none,
+    int repeatInterval = 1,
+    DateTime? repeatEndDate,
+    int? parentId,
   }) async {
     return await into(tasks).insert(
       TasksCompanion.insert(
@@ -102,6 +129,10 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         deadline: Value(deadline),
         scheduledDate: Value(scheduledDate),
         estimatedMinutes: Value(estimatedMinutes),
+        recurrence: Value(recurrence),
+        repeatInterval: Value(repeatInterval),
+        repeatEndDate: Value(repeatEndDate),
+        parentId: Value(parentId),
       ),
     );
   }
@@ -119,6 +150,10 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     DateTime? scheduledDate,
     int? estimatedMinutes,
     int? actualMinutes,
+    TaskRecurrence? recurrence,
+    int? repeatInterval,
+    DateTime? repeatEndDate,
+    int? parentId,
   }) async {
     return await (update(tasks)..where((t) => t.id.equals(id))).write(
       TasksCompanion(
@@ -138,6 +173,14 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
             : const Value.absent(),
         actualMinutes:
             actualMinutes != null ? Value(actualMinutes) : const Value.absent(),
+        recurrence:
+            recurrence != null ? Value(recurrence) : const Value.absent(),
+        repeatInterval: repeatInterval != null
+            ? Value(repeatInterval)
+            : const Value.absent(),
+        repeatEndDate:
+            repeatEndDate != null ? Value(repeatEndDate) : const Value.absent(),
+        parentId: parentId != null ? Value(parentId) : const Value.absent(),
       ),
     );
   }
@@ -180,10 +223,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   Stream<List<Task>> watchActive() {
     return (select(tasks)
           ..where((t) =>
-              t.status.equals(TaskStatus.backlog.name) |
-              t.status.equals(TaskStatus.todo.name) |
-              t.status.equals(TaskStatus.inProgress.name) |
-              t.status.equals(TaskStatus.waiting.name)))
+              _activeStatuses(t) & _templateFilters(t, false)))
         .watch();
   }
 
@@ -193,9 +233,24 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     return (select(tasks)
           ..where((t) =>
               t.deadline.isSmallerThanValue(now) &
-              (t.status.equals(TaskStatus.todo.name) |
-                  t.status.equals(TaskStatus.inProgress.name) |
-                  t.status.equals(TaskStatus.backlog.name))))
+              _activeStatuses(t) &
+              _templateFilters(t, false)))
         .watch();
+  }
+
+  /// Статусы, считающиеся «активными» (не done, не cancelled).
+  Expression<bool> _activeStatuses($TasksTable t) {
+    return t.status.equals(TaskStatus.backlog.name) |
+        t.status.equals(TaskStatus.todo.name) |
+        t.status.equals(TaskStatus.inProgress.name) |
+        t.status.equals(TaskStatus.waiting.name);
+  }
+
+  /// Фильтр шаблонов серий: по умолчанию скрываем, при
+  /// [includeTemplates] = true — показываем все recurrence.
+  Expression<bool> _templateFilters($TasksTable t, bool includeTemplates) {
+    return includeTemplates
+        ? const Constant(true)
+        : t.recurrence.equals(TaskRecurrence.none.name);
   }
 }

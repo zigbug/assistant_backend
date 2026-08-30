@@ -84,7 +84,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Версия схемы. При изменении таблиц — увеличиваем и реализуем migration.
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   /// Стратегия миграций по умолчанию — пересоздавать базу при изменении схемы.
   /// Для production это опасно — нужно будет написать onUpgrade вручную.
@@ -103,6 +103,15 @@ class AppDatabase extends _$AppDatabase {
         if (from < 2) {
           // Пустая миграция — фиксируем версию в истории.
           // В будущем здесь могут появиться реальные ALTER TABLE.
+        }
+        // v3 (30 августа 2026): Повторяемость задач.
+        // В tasks добавлены recurrence, repeat_interval, repeat_end_date,
+        // parent_id (материализованные экземпляры → шаблон серии).
+        if (from < 3) {
+          await m.addColumn(tasks, tasks.recurrence);
+          await m.addColumn(tasks, tasks.repeatInterval);
+          await m.addColumn(tasks, tasks.repeatEndDate);
+          await m.addColumn(tasks, tasks.parentId);
         }
       },
       beforeOpen: (details) async {

@@ -15,9 +15,25 @@ enum TaskStatus {
   cancelled, // Отменено
 }
 
+/// Типы повторения задач.
+/// Enum маппится в БД как строка через textEnum<TaskRecurrence>().
+enum TaskRecurrence {
+  none, // Без повторений
+  daily, // Каждый день
+  weekly, // Каждую неделю
+  monthly, // Каждый месяц
+  yearly, // Каждый год
+}
+
 /// Задачи — основная сущность личного ассистента.
 /// Каждая задача может быть привязана к проекту, иметь дедлайн,
 /// оценку времени и матрицу Эйзенхауэра (важность × срочность).
+///
+/// Повторяемость: задача с `recurrence != none` является «шаблоном» серии.
+/// Планировщик (RecurringTaskMaterializer) заранее материализует из неё
+/// конкретные экземпляры (задачи с `parentId` → шаблон) на каждый
+/// день/неделю/месяц/год вперёд. Экземпляры — обычные задачи,
+/// их можно выполнять/переносить независимо.
 @DataClassName('Task')
 class Tasks extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -69,4 +85,22 @@ class Tasks extends Table {
   /// Когда задача была завершена (для статуса done).
   /// Nullable, т.к. задача ещё может быть в работе.
   DateTimeColumn get completedAt => dateTime().nullable()();
+
+  /// Тип повторения серии (см. TaskRecurrence).
+  /// Для обычных задач — none. Для «шаблонов» серии — daily/weekly/monthly/yearly.
+  // Constant принимает SQL-значение (строку), а не Dart-enum.
+  TextColumn get recurrence =>
+      textEnum<TaskRecurrence>().withDefault(const Constant('none'))();
+
+  /// Интервал повторения: каждые N дней/недель/месяцев/лет.
+  /// Используется только при recurrence != none.
+  IntColumn get repeatInterval => integer().withDefault(const Constant(1))();
+
+  /// Дата окончания серии (после неё экземпляры не создаются).
+  /// Nullable — серия бесконечная (до repeatEndDate или навсегда).
+  DateTimeColumn get repeatEndDate => dateTime().nullable()();
+
+  /// Ссылка на «шаблон» серии. Заполняется у материализованных экземпляров.
+  /// Nullable для обычных задач и самих шаблонов.
+  IntColumn get parentId => integer().nullable().references(Tasks, #id)();
 }

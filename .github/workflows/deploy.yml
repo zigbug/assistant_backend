@@ -2,7 +2,7 @@ name: Deploy to VPS
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:  # позволяет запускать вручную из GitHub UI
 
 jobs:

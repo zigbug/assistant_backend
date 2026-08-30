@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -13,6 +14,8 @@ import 'package:assistant_backend/src/database/daos/events_dao.dart';
 import 'package:assistant_backend/src/database/daos/preferences_dao.dart';
 import 'package:assistant_backend/src/database/daos/projects_dao.dart';
 import 'package:assistant_backend/src/database/daos/tasks_dao.dart';
+import 'package:assistant_backend/src/services/recurring_task_materializer.dart';
+import 'package:assistant_backend/src/services/time_context.dart';
 
 /// Middleware для проверки наличия и корректности API-ключа в заголовке запроса.
 /// Если ключ отсутствует или неверен, возвращает 401 Unauthorized.
@@ -43,16 +46,29 @@ Middleware apiKeyMiddleware() {
 }
 
 /// Вспомогательная функция для создания JSON-ответа с нужным Content-Type.
+///
+/// В каждый JSON-ответ встраивается текущий момент сервера (`serverTimeUtc`),
+/// чтобы AI/MCP сразу понимал, «в каком времени» находится система.
+/// Для объектных тел поле добавляется в body, для списков — в заголовок
+/// `X-Server-Time-Utc`.
 Response jsonResponse(
   int statusCode,
   Object? body, {
   Map<String, String>? additionalHeaders,
 }) {
+  final nowIso = DateTime.now().toUtc().toIso8601String();
+
+  Object? payload = body;
+  if (body is Map<String, dynamic>) {
+    payload = {...body, 'serverTimeUtc': nowIso};
+  }
+
   return Response(
     statusCode,
-    body: jsonEncode(body),
+    body: jsonEncode(payload),
     headers: {
       'Content-Type': 'application/json',
+      'X-Server-Time-Utc': nowIso,
       ...?additionalHeaders,
     },
   );
@@ -68,13 +84,16 @@ Response handleNotFound(String entityName, int id) {
 
 /// Настраивает и возвращает основной роутер приложения.
 /// Вынесен в отдельную функцию для удобства тестирования.
-Router createRouter(AppDatabase db) {
+Router createRouter(AppDatabase db,
+    {RecurringTaskMaterializer? materializer}) {
   final router = Router();
   final tasksDao = TasksDao(db);
   final projectsDao = ProjectsDao(db);
   final preferencesDao = PreferencesDao(db);
   final eventsDao = EventsDao(db);
   final dailyPlansDao = DailyPlansDao(db);
+  final recurringMaterializer =
+      materializer ?? RecurringTaskMaterializer(db);
 
   // === Health Check ===
   // Простой эндпоинт для проверки работоспособности сервера.
@@ -86,6 +105,28 @@ Router createRouter(AppDatabase db) {
   // === API v1 Routes ===
   // Создаем отдельный роутер для API v1, чтобы логически сгруппировать эндпоинты
   final apiRouter = Router();
+
+  // GET /api/v1/time
+  // Возвращает текущее время сервера в UTC и в часовом поясе пользователя.
+  // Нужен AI/MCP, чтобы понимать, какой сейчас момент в системе:
+  //   - serverTimeUtc     — сейчас в UTC (ISO 8601)
+  //   - serverTimeLocal   — сейчас в поясе пользователя (если известен offset)
+  //   - timezone          — имя пояса из Preferences (по умолчанию Europe/Moscow)
+  //   - utcOffsetMinutes  — смещение от UTC (null, если пояс не распознан;
+  //                         можно задать явно через preference utc_offset_minutes)
+  apiRouter.get('/time', (Request request) async {
+    try {
+      final tzName = await preferencesDao.get('timezone');
+      final offsetStr = await preferencesDao.get('utc_offset_minutes');
+      final explicitOffset = int.tryParse(offsetStr ?? '');
+      final ctx = buildTimeContext(DateTime.now(), tzName,
+          explicitOffsetMinutes: explicitOffset);
+      return jsonResponse(200, ctx.toJson());
+    } catch (e, stackTrace) {
+      print('Error fetching time: $e\n$stackTrace');
+      return jsonResponse(500, {'error': 'Failed to fetch time'});
+    }
+  });
 
   // ---------------------------------------------------------------------------
   // TASKS ENDPOINTS
@@ -119,8 +160,10 @@ Router createRouter(AppDatabase db) {
         }
         tasks = await tasksDao.getScheduledForDate(date.toUtc());
       } else {
-        // По умолчанию — активные задачи (можно отфильтровать по статусу/проекту)
-        tasks = await tasksDao.getActive();
+        // По умолчанию — активные задачи (можно отфильтровать по статусу/проекту).
+        // Шаблоны серий скрыты, если не передан ?include_templates=true.
+        final includeTemplates = params['include_templates'] == 'true';
+        tasks = await tasksDao.getActive(includeTemplates: includeTemplates);
 
         // Дополнительная фильтрация по статусу
         final statusFilter = params['status'];
@@ -190,6 +233,28 @@ Router createRouter(AppDatabase db) {
             )
           : TaskStatus.todo;
 
+      // === Повторяемость (серия задач) ===
+      // recurrence: none|daily|weekly|monthly|yearly
+      final recurrence = data['recurrence'] is String
+          ? TaskRecurrence.values.firstWhere(
+              (e) => e.name == data['recurrence'],
+              orElse: () => TaskRecurrence.none,
+            )
+          : TaskRecurrence.none;
+      // repeatInterval: каждые N дней/недель/месяцев/лет (>= 1)
+      final repeatInterval =
+          data['repeatInterval'] is int && (data['repeatInterval'] as int) >= 1
+              ? data['repeatInterval'] as int
+              : 1;
+      // repeatEndDate: до какой даты продолжать серию (опционально, ISO 8601)
+      DateTime? repeatEndDate;
+      if (data['repeatEndDate'] != null && data['repeatEndDate'] is String) {
+        repeatEndDate =
+            DateTime.tryParse(data['repeatEndDate'] as String)?.toUtc();
+      }
+      // parentId: для экземпляров серии (обычно создаются материализатором)
+      final int? parentId = data['parentId'] is int ? data['parentId'] as int : null;
+
       // Вызываем метод DAO — он сам сформирует TasksCompanion и вставит запись
       final taskId = await tasksDao.create(
         title: title,
@@ -201,7 +266,18 @@ Router createRouter(AppDatabase db) {
         deadline: deadline,
         scheduledDate: scheduledDate,
         estimatedMinutes: estimatedMinutes,
+        recurrence: recurrence,
+        repeatInterval: repeatInterval,
+        repeatEndDate: repeatEndDate,
+        parentId: parentId,
       );
+
+      // Если это шаблон серии — сразу материализуем ближайшие экземпляры,
+      // чтобы задача появилась в плане уже с сегодняшнего дня.
+      if (recurrence != TaskRecurrence.none) {
+        await recurringMaterializer.materializeUpTo(
+            now: DateTime.now().toUtc());
+      }
 
       return jsonResponse(
         201,
@@ -323,6 +399,49 @@ Router createRouter(AppDatabase db) {
         }
       }
 
+      // === Обновление повторяемости (серия задач) ===
+      TaskRecurrence? recurrence;
+      if (data['recurrence'] is String) {
+        try {
+          recurrence = TaskRecurrence.values.firstWhere(
+            (e) => e.name == data['recurrence'],
+          );
+        } catch (_) {
+          return jsonResponse(400, {
+            'error':
+                'Invalid recurrence. Allowed: ${TaskRecurrence.values.map((e) => e.name).join(', ')}',
+          });
+        }
+      }
+
+      int? repeatInterval;
+      if (data['repeatInterval'] is int) {
+        final ri = data['repeatInterval'] as int;
+        if (ri < 1) {
+          return jsonResponse(400, {'error': 'repeatInterval must be >= 1'});
+        }
+        repeatInterval = ri;
+      }
+
+      // repeatEndDate: null — сбросить (серия бесконечная), строка — задать.
+      DateTime? repeatEndDate;
+      if (data.containsKey('repeatEndDate')) {
+        if (data['repeatEndDate'] == null) {
+          repeatEndDate = null;
+        } else if (data['repeatEndDate'] is String) {
+          repeatEndDate =
+              DateTime.tryParse(data['repeatEndDate'] as String)?.toUtc();
+          if (repeatEndDate == null) {
+            return jsonResponse(400, {
+              'error': 'Invalid repeatEndDate format. Use ISO 8601',
+            });
+          }
+        }
+      }
+
+      final int? parentId =
+          data['parentId'] is int ? data['parentId'] as int : null;
+
       // Вызываем DAO для обновления
       final updatedCount = await tasksDao.updateTask(
         taskId,
@@ -336,10 +455,22 @@ Router createRouter(AppDatabase db) {
         scheduledDate: scheduledDate,
         estimatedMinutes: estimatedMinutes,
         actualMinutes: actualMinutes,
+        recurrence: recurrence,
+        repeatInterval: repeatInterval,
+        repeatEndDate: data.containsKey('repeatEndDate')
+            ? repeatEndDate
+            : null,
+        parentId: parentId,
       );
 
       if (updatedCount == 0) {
         return handleNotFound('Task', taskId);
+      }
+
+      // Если задача стала шаблоном серии — пересоздаём/дополняем экземпляры.
+      if (recurrence != null && recurrence != TaskRecurrence.none) {
+        await recurringMaterializer.materializeUpTo(
+            now: DateTime.now().toUtc());
       }
 
       // Возвращаем обновленную задачу
@@ -1607,8 +1738,31 @@ Future<void> main(List<String> args) async {
   // Для тестов можно передать inMemory: true.
   final db = createDatabase();
 
+  // Материализатор повторяющихся задач.
+  final materializer = RecurringTaskMaterializer(db);
+
+  // Первичная материализация при старте (идемпотентна) —
+  // чтобы серии, созданные во время простоя сервера, появились сразу.
+  try {
+    final initial = await materializer.materializeUpTo(
+        now: DateTime.now().toUtc());
+    print(
+        'Recurring tasks: ${initial.created} instance(s) materialized from ${initial.templatesProcessed} template(s)');
+  } catch (e, stackTrace) {
+    print('Error materializing recurring tasks at startup: $e\n$stackTrace');
+  }
+
+  // Планировщик: каждые 6 часов проверяем и материализуем новые экземпляры.
+  Timer.periodic(const Duration(hours: 6), (_) async {
+    try {
+      await materializer.materializeUpTo(now: DateTime.now().toUtc());
+    } catch (e, stackTrace) {
+      print('Error in recurring tasks scheduler: $e\n$stackTrace');
+    }
+  });
+
   // Создаем роутер с эндпоинтами
-  final router = createRouter(db);
+  final router = createRouter(db, materializer: materializer);
 
   // Собираем цепочку обработчиков (pipeline)
   // 1. logRequests() - логирует все входящие запросы в консоль
