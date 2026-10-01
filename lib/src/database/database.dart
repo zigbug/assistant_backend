@@ -84,7 +84,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Версия схемы. При изменении таблиц — увеличиваем и реализуем migration.
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   /// Стратегия миграций по умолчанию — пересоздавать базу при изменении схемы.
   /// Для production это опасно — нужно будет написать onUpgrade вручную.
@@ -112,6 +112,17 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(tasks, tasks.repeatInterval);
           await m.addColumn(tasks, tasks.repeatEndDate);
           await m.addColumn(tasks, tasks.parentId);
+        }
+        // v4 (2 октября 2026): Точное окончание и «мягкость» событий.
+        // В events добавлены endsAt (nullable — для событий «на весь день»
+        // окончание не выражено), byWeekdays (битовая маска дней недели,
+        // 0 = любой день) и canOverlap (мягкое событие не конфликтует
+        // с другими по времени). Существующие строки получают дефолты:
+        // endsAt = NULL, byWeekdays = 0, canOverlap = 0.
+        if (from < 4) {
+          await m.addColumn(events, events.endsAt);
+          await m.addColumn(events, events.byWeekdays);
+          await m.addColumn(events, events.canOverlap);
         }
       },
       beforeOpen: (details) async {

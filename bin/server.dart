@@ -82,6 +82,76 @@ Response handleNotFound(String entityName, int id) {
   });
 }
 
+/// Результат разбора параметра `byWeekdays` (битовая маска дней недели).
+class _ByWeekdaysResult {
+  const _ByWeekdaysResult({this.mask = 0, this.error});
+
+  /// Распознанная маска. 0 — «любой день».
+  final int mask;
+
+  /// Текст ошибки 400, если разбор не удался.
+  final String? error;
+}
+
+/// Разбирает `byWeekdays` из тела запроса.
+///
+/// Принимает три формы (не более одного аргумента за раз):
+///   - `31`                     — битовая маска целиком
+///   - `["mon", "wed"]`         — список коротких или полных имён дней
+///   - `"weekdays"` / `"all"`   — именованные пресеты
+///
+/// Возвращает маску 0 («любой день»), если поле не передано.
+_ByWeekdaysResult _parseByWeekdays(Object? raw) {
+  if (raw == null) return const _ByWeekdaysResult();
+
+  if (raw is int) {
+    if (!Weekdays.isValid(raw)) {
+      return _ByWeekdaysResult(
+        error: 'Invalid byWeekdays: $raw. Expected 0 or a bitmask 0-127',
+      );
+    }
+    return _ByWeekdaysResult(mask: raw);
+  }
+
+  if (raw is String) {
+    const presets = {
+      'weekdays': Weekdays.weekdays,
+      'workdays': Weekdays.weekdays,
+      'weekend': Weekdays.weekend,
+      'all': Weekdays.all,
+      'every': Weekdays.all,
+    };
+    final preset = presets[raw.trim().toLowerCase()];
+    if (preset != null) return _ByWeekdaysResult(mask: preset);
+
+    // Одиночный день строкой: "mon"
+    final single = Weekdays.fromNames([raw]);
+    if (single == null) {
+      return _ByWeekdaysResult(
+        error: 'Invalid byWeekdays: "$raw". '
+            'Allowed presets: weekdays, weekend, all; or a day name: mon..sun',
+      );
+    }
+    return _ByWeekdaysResult(mask: single);
+  }
+
+  if (raw is List) {
+    if (raw.isEmpty) return const _ByWeekdaysResult();
+    final mask = Weekdays.fromNames(raw.map((e) => e.toString()));
+    if (mask == null) {
+      return _ByWeekdaysResult(
+        error: 'Invalid byWeekdays: ${raw.join(', ')}. '
+            'Day names: mon..sun (also tue/thur/weds full forms)',
+      );
+    }
+    return _ByWeekdaysResult(mask: mask);
+  }
+
+  return _ByWeekdaysResult(
+    error: 'Invalid byWeekdays: expected int, string or list of strings',
+  );
+}
+
 /// Настраивает и возвращает основной роутер приложения.
 /// Вынесен в отдельную функцию для удобства тестирования.
 Router createRouter(AppDatabase db,
@@ -945,8 +1015,11 @@ Router createRouter(AppDatabase db,
   // {
   //   "title": "Созвон с командой",        // обязательное (1-200 символов)
   //   "startsAt": "2026-08-22T14:00:00Z",  // обязательное (ISO 8601, UTC)
+  //   "endsAt": "2026-08-22T15:00:00Z",    // опциональное, обязательно если не isAllDay
   //   "isAllDay": false,                    // опциональное, default false
   //   "recurrence": "weekly",               // опциональное: none|daily|weekly|monthly|yearly
+  //   "byWeekdays": 31,                     // опциональное, битовая маска дней недели
+  //   "canOverlap": true,                   // опциональное, default false
   //   "remindMinutesBefore": 15,            // опциональное, default 30
   //   "location": "Zoom"                    // опциональное
   // }
@@ -998,6 +1071,28 @@ Router createRouter(AppDatabase db,
         });
       }
 
+      // === Парсинг endsAt ===
+      // Без него длительность события неизвестна, и план дня вынужден
+      // угадывать её. Поэтому для событий с временем поле обязательно.
+      DateTime? endsAt;
+      if (data['endsAt'] is String) {
+        endsAt = DateTime.tryParse(data['endsAt'] as String);
+        if (endsAt == null) {
+          return jsonResponse(400, {
+            'error': 'Invalid endsAt format. Use ISO 8601',
+          });
+        }
+        if (endsAt.isBefore(startsAt)) {
+          return jsonResponse(400, {
+            'error': 'endsAt must be after startsAt',
+          });
+        }
+      } else if (!isAllDay) {
+        return jsonResponse(400, {
+          'error': 'endsAt is required for timed events (or set isAllDay=true)',
+        });
+      }
+
       // === Парсинг recurrence enum ===
       Recurrence recurrence = Recurrence.none;
       if (data['recurrence'] is String) {
@@ -1013,13 +1108,28 @@ Router createRouter(AppDatabase db,
         }
       }
 
+      // === Парсинг маски дней недели ===
+      // Принимаем либо битовую маску (int), либо список имён ['mon','wed'].
+      final byWeekdaysResult = _parseByWeekdays(data['byWeekdays']);
+      if (byWeekdaysResult.error != null) {
+        return jsonResponse(400, {'error': byWeekdaysResult.error});
+      }
+      final byWeekdays = byWeekdaysResult.mask;
+
+      // === Парсинг canOverlap ===
+      final canOverlap =
+          data['canOverlap'] is bool ? data['canOverlap'] as bool : false;
+
       // === Создание через DAO ===
       // Приводим startsAt к UTC согласно нашему архитектурному решению
       final eventId = await eventsDao.create(
         title: title,
         startsAt: startsAt.toUtc(),
+        endsAt: endsAt?.toUtc(),
         isAllDay: isAllDay,
         recurrence: recurrence,
+        byWeekdays: byWeekdays,
+        canOverlap: canOverlap,
         remindMinutesBefore: remindMinutesBefore,
         location: location,
       );
@@ -1107,6 +1217,27 @@ Router createRouter(AppDatabase db,
         }
       }
 
+      // endsAt: null — сбросить окончание, строка — задать.
+      DateTime? endsAt;
+      var clearEndsAt = false;
+      if (data.containsKey('endsAt')) {
+        if (data['endsAt'] == null) {
+          clearEndsAt = true;
+        } else if (data['endsAt'] is String) {
+          endsAt = DateTime.tryParse(data['endsAt'] as String);
+          if (endsAt == null) {
+            return jsonResponse(400, {'error': 'Invalid endsAt format'});
+          }
+          endsAt = endsAt.toUtc();
+        }
+      }
+
+      // Проверяем, что окончание не оказалось раньше начала
+      final effectiveStart = startsAt ?? existing.startsAt;
+      if (!clearEndsAt && endsAt != null && endsAt.isBefore(effectiveStart)) {
+        return jsonResponse(400, {'error': 'endsAt must be after startsAt'});
+      }
+
       bool? isAllDay =
           data['isAllDay'] is bool ? data['isAllDay'] as bool : null;
       String? location = data['location']?.toString();
@@ -1135,12 +1266,30 @@ Router createRouter(AppDatabase db,
         }
       }
 
+      // === Парсинг маски дней недели ===
+      int? byWeekdays;
+      if (data.containsKey('byWeekdays')) {
+        final parsed = _parseByWeekdays(data['byWeekdays']);
+        if (parsed.error != null) {
+          return jsonResponse(400, {'error': parsed.error});
+        }
+        byWeekdays = parsed.mask;
+      }
+
+      // === Парсинг canOverlap ===
+      bool? canOverlap =
+          data['canOverlap'] is bool ? data['canOverlap'] as bool : null;
+
       final updatedCount = await eventsDao.updateEvent(
         eventId,
         title: title,
         startsAt: startsAt,
+        endsAt: endsAt,
+        clearEndsAt: clearEndsAt,
         isAllDay: isAllDay,
         recurrence: recurrence,
+        byWeekdays: byWeekdays,
+        canOverlap: canOverlap,
         remindMinutesBefore: remindMinutesBefore,
         location: location,
       );
@@ -1239,17 +1388,18 @@ Router createRouter(AppDatabase db,
           .get();
 
       for (final event in events) {
-        // Для событий на весь день endTime не задаём (null)
-        // Для обычных событий — endTime = startsAt + 1 час (базовая эвристика)
+        // Длительность события берём из endsAt. Если его нет (событие
+        // «на весь день» или длительность не задана) — endTime не выставляем,
+        // а не подставляем искусственный час.
         await dailyPlansDao.addItem(
           planId: plan.id,
           itemType: PlanItemType.event,
           refId: event.id,
           startTime: event.startsAt,
-          endTime: event.isAllDay
-              ? null
-              : event.startsAt.add(const Duration(hours: 1)),
-          note: event.title,
+          endTime: event.endsAt,
+          note: event.canOverlap
+              ? '${event.title} (мягкое: не вытесняет другие блоки)'
+              : event.title,
         );
       }
 
