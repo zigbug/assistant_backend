@@ -228,7 +228,11 @@ Router createRouter(AppDatabase db,
             'error': 'Invalid date format. Use ISO 8601 (e.g. 2026-08-20)',
           });
         }
-        tasks = await tasksDao.getScheduledForDate(date.toUtc());
+        // Дату передаём «как есть»: getScheduledForDate нормализует к
+        // локальной полуночи. Дополнительный toUtc() здесь сдвигал цель
+        // на сутки назад (UTC-компоненты читались у уже-UTC значения),
+        // и фильтр отдавал задачи за предыдущий день.
+        tasks = await tasksDao.getScheduledForDate(date);
       } else {
         // По умолчанию — активные задачи (можно отфильтровать по статусу/проекту).
         // Шаблоны серий скрыты, если не передан ?include_templates=true.
