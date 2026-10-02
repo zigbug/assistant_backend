@@ -2,10 +2,10 @@ import 'package:drift/drift.dart';
 
 /// Категории выводов AI.
 enum LessonCategory {
-  planning,      // Паттерны планирования (когда и сколько)
-  estimates,     // Оценки времени (занижение/завышение)
-  preferences,   // Предпочтения пользователя
-  productivity,  // Паттерны продуктивности (дни, часы)
+  planning, // Паттерны планирования (когда и сколько)
+  estimates, // Оценки времени (занижение/завышение)
+  preferences, // Предпочтения пользователя
+  productivity, // Паттерны продуктивности (дни, часы)
 }
 
 /// Выводы AI, полученные из анализа истории работы.
@@ -42,19 +42,15 @@ class AiLessons extends Table {
   /// Степень уверенности (0.0 .. 1.0).
   /// Чем больше evidence_count, тем выше confidence.
   /// Диапазон валидируется в DAO.
-  RealColumn get confidence =>
-      real().withDefault(const Constant(0.5))();
+  RealColumn get confidence => real().withDefault(const Constant(0.5))();
 
   /// Количество наблюдений, на которых основан вывод.
   /// Чем больше — тем вывод надёжнее.
-  IntColumn get evidenceCount =>
-      integer().withDefault(const Constant(1))();
+  IntColumn get evidenceCount => integer().withDefault(const Constant(1))();
 
   /// Когда вывод был впервые сделан.
-  DateTimeColumn get createdAt =>
-      dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   /// Когда вывод был обновлён (новое наблюдение подтвердило или уточнило).
-  DateTimeColumn get updatedAt =>
-      dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 }

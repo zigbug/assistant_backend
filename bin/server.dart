@@ -14,6 +14,7 @@ import 'package:assistant_backend/src/database/daos/events_dao.dart';
 import 'package:assistant_backend/src/database/daos/preferences_dao.dart';
 import 'package:assistant_backend/src/database/daos/projects_dao.dart';
 import 'package:assistant_backend/src/database/daos/tasks_dao.dart';
+import 'package:assistant_backend/src/services/day_scheduler.dart';
 import 'package:assistant_backend/src/services/recurring_task_materializer.dart';
 import 'package:assistant_backend/src/services/time_context.dart';
 
@@ -80,6 +81,30 @@ Response handleNotFound(String entityName, int id) {
   return jsonResponse(404, {
     'error': '$entityName with id=$id not found',
   });
+}
+
+/// Разбирает `scheduledTime` — время начала в течение дня.
+///
+/// Принимает и число минут от полуночи (`540` = 09:00), и строку
+/// `"09:00"` / `"9:00"` — так удобнее и человеку, и клиенту. Возвращает
+/// null для отсутствующего или неразборчивого значения: лучше поставить
+/// задачу без времени, чем записать мусор в расписание.
+int? parseScheduledTime(Map<String, dynamic> data) {
+  final raw = data['scheduledTime'];
+  if (raw == null) return null;
+
+  if (raw is int) return (raw >= 0 && raw < 24 * 60) ? raw : null;
+
+  if (raw is String) {
+    final match = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(raw.trim());
+    if (match == null) return null;
+    final hours = int.parse(match.group(1)!);
+    final minutes = int.parse(match.group(2)!);
+    if (hours > 23 || minutes > 59) return null;
+    return hours * 60 + minutes;
+  }
+
+  return null;
 }
 
 /// Результат разбора параметра `byWeekdays` (битовая маска дней недели).
@@ -154,16 +179,14 @@ _ByWeekdaysResult _parseByWeekdays(Object? raw) {
 
 /// Настраивает и возвращает основной роутер приложения.
 /// Вынесен в отдельную функцию для удобства тестирования.
-Router createRouter(AppDatabase db,
-    {RecurringTaskMaterializer? materializer}) {
+Router createRouter(AppDatabase db, {RecurringTaskMaterializer? materializer}) {
   final router = Router();
   final tasksDao = TasksDao(db);
   final projectsDao = ProjectsDao(db);
   final preferencesDao = PreferencesDao(db);
   final eventsDao = EventsDao(db);
   final dailyPlansDao = DailyPlansDao(db);
-  final recurringMaterializer =
-      materializer ?? RecurringTaskMaterializer(db);
+  final recurringMaterializer = materializer ?? RecurringTaskMaterializer(db);
 
   // === Health Check ===
   // Простой эндпоинт для проверки работоспособности сервера.
@@ -287,6 +310,9 @@ Router createRouter(AppDatabase db,
           ? data['estimatedMinutes'] as int
           : null;
 
+      // scheduledTime необязателен: null значит «время не задано».
+      final scheduledTime = parseScheduledTime(data);
+
       // Парсинг дат: поддерживаем ISO 8601 строки (например, "2026-08-20T14:30:00Z")
       DateTime? deadline;
       if (data['deadline'] != null && data['deadline'] is String) {
@@ -327,7 +353,8 @@ Router createRouter(AppDatabase db,
             DateTime.tryParse(data['repeatEndDate'] as String)?.toUtc();
       }
       // parentId: для экземпляров серии (обычно создаются материализатором)
-      final int? parentId = data['parentId'] is int ? data['parentId'] as int : null;
+      final int? parentId =
+          data['parentId'] is int ? data['parentId'] as int : null;
 
       // Вызываем метод DAO — он сам сформирует TasksCompanion и вставит запись
       final taskId = await tasksDao.create(
@@ -344,6 +371,7 @@ Router createRouter(AppDatabase db,
         repeatInterval: repeatInterval,
         repeatEndDate: repeatEndDate,
         parentId: parentId,
+        scheduledTime: scheduledTime,
       );
 
       // Если это шаблон серии — сразу материализуем ближайшие экземпляры,
@@ -426,6 +454,10 @@ Router createRouter(AppDatabase db,
           : null;
       final int? actualMinutes =
           data['actualMinutes'] is int ? data['actualMinutes'] as int : null;
+
+      // null в scheduledTime сбрасывает время начала в течение дня.
+      final int? scheduledTime =
+          data.containsKey('scheduledTime') ? parseScheduledTime(data) : null;
 
       // Парсинг дат
       DateTime? deadline;
@@ -531,10 +563,11 @@ Router createRouter(AppDatabase db,
         actualMinutes: actualMinutes,
         recurrence: recurrence,
         repeatInterval: repeatInterval,
-        repeatEndDate: data.containsKey('repeatEndDate')
-            ? repeatEndDate
-            : null,
+        repeatEndDate: data.containsKey('repeatEndDate') ? repeatEndDate : null,
         parentId: parentId,
+        scheduledTime: scheduledTime,
+        clearScheduledTime:
+            data.containsKey('scheduledTime') && data['scheduledTime'] == null,
       );
 
       if (updatedCount == 0) {
@@ -1407,42 +1440,108 @@ Router createRouter(AppDatabase db,
         );
       }
 
-      // === Добавляем задачи, запланированные на эту дату ===
+      // === Раскладываем задачи дня по свободным слотам ===
+      //
+      // Раньше каждая задача начиналась в полночь своей даты, а задачи
+      // без оценки времени вообще оставались без интервала — план был
+      // нечитаемым. Теперь события считаются занятыми интервалами, а
+      // задачи заполняют оставшиеся окна рабочего дня.
       final scheduledTasks = await tasksDao.getScheduledForDate(targetDate);
-      final scheduledTaskIds = <int>{};
-      for (final task in scheduledTasks) {
-        scheduledTaskIds.add(task.id);
-        final startTime = task.scheduledDate ?? targetDate;
-        // Если есть оценка времени — вычисляем endTime
-        final endTime = task.estimatedMinutes != null
-            ? startTime.add(Duration(minutes: task.estimatedMinutes!))
-            : null;
+      final overdueTasks = await tasksDao.getOverdue();
+      final scheduledTaskIds = scheduledTasks.map((t) => t.id).toSet();
+      final overdueIds =
+          overdueTasks.where((t) => !scheduledTaskIds.contains(t.id)).toList();
+
+      // Локальный день для расчёта слотов: слот «09:00» должен означать
+      // 09:00 по часам пользователя, а не по UTC. targetDate — тот же
+      // календарный день, сохранённый как UTC-полночь.
+      final dayLocal =
+          DateTime(targetDate.year, targetDate.month, targetDate.day);
+
+      final busy = <BusyInterval>[
+        for (final event in events)
+          if (event.endsAt != null)
+            (
+              start: event.startsAt.toLocal(),
+              end: event.endsAt!.toLocal(),
+            ),
+      ];
+
+      final schedulable = <SchedulableTask>[
+        for (final task in scheduledTasks)
+          if (task.estimatedMinutes != null)
+            SchedulableTask(
+              refId: task.id,
+              durationMinutes: task.estimatedMinutes!,
+              scheduledTime: task.scheduledTime,
+              priority: task.importance * 10 + task.urgency,
+            ),
+        for (final task in overdueIds)
+          if (task.estimatedMinutes != null)
+            SchedulableTask(
+              refId: task.id,
+              durationMinutes: task.estimatedMinutes!,
+              scheduledTime: task.scheduledTime,
+              isOverdue: true,
+              priority: task.importance * 10 + task.urgency,
+            ),
+      ];
+
+      final layout = DayScheduler().schedule(
+        day: dayLocal,
+        busy: busy,
+        tasks: schedulable,
+      );
+
+      final tasksById = <int, Task>{
+        for (final task in scheduledTasks) task.id: task,
+        for (final task in overdueIds) task.id: task,
+      };
+      final overdueIdSet = overdueIds.map((t) => t.id).toSet();
+
+      for (final placed in layout.tasks) {
+        final task = tasksById[placed.refId]!;
+        final isOverdue = overdueIdSet.contains(placed.refId);
+        await dailyPlansDao.addItem(
+          planId: plan.id,
+          itemType: PlanItemType.task,
+          refId: placed.refId,
+          startTime: placed.slot!.start.toUtc(),
+          endTime: placed.slot!.end.toUtc(),
+          note: isOverdue ? 'OVERDUE: ${task.title}' : task.title,
+        );
+      }
+
+      // Задачи, которые не удалось разместить: без оценки времени или
+      // не поместились в день. Время оставляем null — честнее, чем
+      // притворяться, что слот есть.
+      final placedIds = layout.tasks.map((t) => t.refId).toSet();
+      final unplaced = [
+        for (final task in scheduledTasks)
+          if (!placedIds.contains(task.id) && task.estimatedMinutes == null)
+            task,
+        for (final task in overdueIds)
+          if (!placedIds.contains(task.id) && task.estimatedMinutes == null)
+            task,
+      ];
+      for (final task in unplaced) {
+        final isOverdue = overdueIdSet.contains(task.id);
         await dailyPlansDao.addItem(
           planId: plan.id,
           itemType: PlanItemType.task,
           refId: task.id,
-          startTime: startTime,
-          endTime: endTime,
-          note: task.title,
+          startTime: targetDate,
+          endTime: null,
+          note: isOverdue ? 'OVERDUE: ${task.title}' : task.title,
         );
       }
 
-      // === Добавляем просроченные задачи (catch-up) ===
-      // Берём задачи с deadline < сегодня, не включённые уже в план.
-      // Это напоминает пользователю о забытых задачах.
-      final overdueTasks = await tasksDao.getOverdue();
-      for (final task in overdueTasks) {
-        if (!scheduledTaskIds.contains(task.id)) {
-          await dailyPlansDao.addItem(
-            planId: plan.id,
-            itemType: PlanItemType.task,
-            refId: task.id,
-            startTime: targetDate,
-            endTime: null,
-            note: 'OVERDUE: ${task.title}',
-          );
-        }
-      }
+      // Задачи с оценкой, но без свободного слота — сообщаем отдельно, чтобы
+      // MCP мог сказать «в день не влезает», а не молча не показать задачу.
+      final overflowing = layout.unplaced
+          .map((t) => tasksById[t.refId])
+          .whereType<Task>()
+          .toList();
 
       // Возвращаем полный план с элементами
       final result = await dailyPlansDao.getPlanWithItems(plan.id);
@@ -1898,8 +1997,8 @@ Future<void> main(List<String> args) async {
   // Первичная материализация при старте (идемпотентна) —
   // чтобы серии, созданные во время простоя сервера, появились сразу.
   try {
-    final initial = await materializer.materializeUpTo(
-        now: DateTime.now().toUtc());
+    final initial =
+        await materializer.materializeUpTo(now: DateTime.now().toUtc());
     print(
         'Recurring tasks: ${initial.created} instance(s) materialized from ${initial.templatesProcessed} template(s)');
   } catch (e, stackTrace) {

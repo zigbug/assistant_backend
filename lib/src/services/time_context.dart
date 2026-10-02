@@ -93,8 +93,8 @@ int? russianTimezoneOffset(String tz) {
 /// Распознаёт строки вида "UTC", "UTC+3", "UTC-2:30", "GMT+1".
 int? parseUtcOffset(String value) {
   final normalized = value.trim().toUpperCase().replaceAll(' ', '');
-  final match = RegExp(r'^(?:UTC|GMT)([+-]\d{1,2}(?::?\d{2})?)?$')
-      .firstMatch(normalized);
+  final match =
+      RegExp(r'^(?:UTC|GMT)([+-]\d{1,2}(?::?\d{2})?)?$').firstMatch(normalized);
   if (match == null) return null;
   final group = match.group(1);
   if (group == null || group.isEmpty) return 0;
@@ -102,6 +102,7 @@ int? parseUtcOffset(String value) {
   final signGroup = RegExp(r'([+-])(\d{1,2})(?::?(\d{2}))?').firstMatch(group)!;
   final sign = signGroup.group(1) == '-' ? -1 : 1;
   final hours = int.parse(signGroup.group(2)!);
-  final minutes = signGroup.group(3) == null ? 0 : int.parse(signGroup.group(3)!);
+  final minutes =
+      signGroup.group(3) == null ? 0 : int.parse(signGroup.group(3)!);
   return sign * (hours * 60 + minutes);
 }

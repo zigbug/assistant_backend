@@ -24,8 +24,7 @@ class Preferences extends Table {
   TextColumn get value => text()();
 
   /// Дата и время последнего изменения.
-  DateTimeColumn get updatedAt =>
-      dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
   /// Первичный ключ — только key (строковое хранилище).
   @override

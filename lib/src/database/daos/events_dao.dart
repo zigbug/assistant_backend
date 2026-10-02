@@ -93,12 +93,12 @@ class EventsDao extends DatabaseAccessor<AppDatabase> with _$EventsDaoMixin {
             recurrence != null ? Value(recurrence) : const Value.absent(),
         byWeekdays:
             byWeekdays != null ? Value(byWeekdays) : const Value.absent(),
-        canOverlap: canOverlap != null ? Value(canOverlap) : const Value.absent(),
+        canOverlap:
+            canOverlap != null ? Value(canOverlap) : const Value.absent(),
         remindMinutesBefore: remindMinutesBefore != null
             ? Value(remindMinutesBefore)
             : const Value.absent(),
-        location:
-            location != null ? Value(location) : const Value.absent(),
+        location: location != null ? Value(location) : const Value.absent(),
       ),
     );
   }

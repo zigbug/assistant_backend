@@ -34,6 +34,5 @@ class AppConstants {
   /// `0.0.0.0` — слушать на всех интерфейсах (нужно в Docker и при доступе
   /// извне через reverse proxy). Для изолированного локального запуска
   /// можно установить `localhost`.
-  static String get serverHost =>
-      Platform.environment['HOST'] ?? '0.0.0.0';
+  static String get serverHost => Platform.environment['HOST'] ?? '0.0.0.0';
 }

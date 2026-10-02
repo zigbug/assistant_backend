@@ -17,8 +17,8 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   /// (например для редактирования частоты повторения).
   Future<List<Task>> getActive({bool includeTemplates = false}) async {
     return await (select(tasks)
-          ..where((t) => _activeStatuses(t) &
-              _templateFilters(t, includeTemplates)))
+          ..where((t) =>
+              _activeStatuses(t) & _templateFilters(t, includeTemplates)))
         .get();
   }
 
@@ -117,6 +117,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     int repeatInterval = 1,
     DateTime? repeatEndDate,
     int? parentId,
+    int? scheduledTime,
   }) async {
     return await into(tasks).insert(
       TasksCompanion.insert(
@@ -133,6 +134,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         repeatInterval: Value(repeatInterval),
         repeatEndDate: Value(repeatEndDate),
         parentId: Value(parentId),
+        scheduledTime: Value(scheduledTime),
       ),
     );
   }
@@ -154,6 +156,8 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     int? repeatInterval,
     DateTime? repeatEndDate,
     int? parentId,
+    int? scheduledTime,
+    bool clearScheduledTime = false,
   }) async {
     return await (update(tasks)..where((t) => t.id.equals(id))).write(
       TasksCompanion(
@@ -181,6 +185,11 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         repeatEndDate:
             repeatEndDate != null ? Value(repeatEndDate) : const Value.absent(),
         parentId: parentId != null ? Value(parentId) : const Value.absent(),
+        scheduledTime: scheduledTime != null
+            ? Value(scheduledTime)
+            : (clearScheduledTime
+                ? const Value<int?>(null)
+                : const Value.absent()),
       ),
     );
   }
@@ -222,8 +231,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   /// Reactive stream активных задач
   Stream<List<Task>> watchActive() {
     return (select(tasks)
-          ..where((t) =>
-              _activeStatuses(t) & _templateFilters(t, false)))
+          ..where((t) => _activeStatuses(t) & _templateFilters(t, false)))
         .watch();
   }
 

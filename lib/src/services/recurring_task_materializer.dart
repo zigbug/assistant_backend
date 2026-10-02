@@ -110,9 +110,9 @@ class RecurringTaskMaterializer {
     return created;
   }
 
-  Future<void> _createOccurrence(Task template, DateTime occurrence, DateTime day) async {
-    final title =
-        '${template.title} (${_shortDate(day)})';
+  Future<void> _createOccurrence(
+      Task template, DateTime occurrence, DateTime day) async {
+    final title = '${template.title} (${_shortDate(day)})';
     await _tasksDao.create(
       title: title,
       description: template.description,
@@ -122,6 +122,7 @@ class RecurringTaskMaterializer {
       urgency: template.urgency,
       scheduledDate: occurrence,
       estimatedMinutes: template.estimatedMinutes,
+      scheduledTime: template.scheduledTime,
       recurrence: TaskRecurrence.none,
       repeatInterval: 1,
       parentId: template.id,

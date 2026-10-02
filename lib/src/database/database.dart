@@ -84,7 +84,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Версия схемы. При изменении таблиц — увеличиваем и реализуем migration.
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   /// Стратегия миграций по умолчанию — пересоздавать базу при изменении схемы.
   /// Для production это опасно — нужно будет написать onUpgrade вручную.
@@ -123,6 +123,14 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(events, events.endsAt);
           await m.addColumn(events, events.byWeekdays);
           await m.addColumn(events, events.canOverlap);
+        }
+        // v5 (2 октября 2026): Время начала в течение дня.
+        // В tasks добавлена колонка scheduled_time (nullable int, минуты
+        // от полуночи). Нужна планировщику дня, чтобы раскладывать задачи
+        // по осмысленным слотам. Существующие строки получают NULL —
+        // это «время не задано», планировщик подберёт слот сам.
+        if (from < 5) {
+          await m.addColumn(tasks, tasks.scheduledTime);
         }
       },
       beforeOpen: (details) async {
