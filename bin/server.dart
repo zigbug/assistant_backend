@@ -107,6 +107,20 @@ int? parseScheduledTime(Map<String, dynamic> data) {
   return null;
 }
 
+/// Возвращает текст ошибки, если `scheduledTime` передан, но не разбирается.
+///
+/// null — значение можно принять (в том числе явный null «сбрось время»).
+/// Неразборчивое значение молча вырождалось в «время не задано», и задача,
+/// которой пользователь назначил конкретный час, теряла его без предупреждения.
+String? scheduledTimeErrorIn(Map<String, dynamic> data) {
+  if (!data.containsKey('scheduledTime')) return null;
+  final raw = data['scheduledTime'];
+  if (raw == null) return null;
+  if (parseScheduledTime(data) != null) return null;
+  return 'Invalid scheduledTime: expected minutes from midnight (0..1439) '
+      'or "HH:MM", got ${raw is String ? '"$raw"' : raw}';
+}
+
 /// Результат разбора параметра `byWeekdays` (битовая маска дней недели).
 class _ByWeekdaysResult {
   const _ByWeekdaysResult({this.mask = 0, this.error});
@@ -311,6 +325,13 @@ Router createRouter(AppDatabase db, {RecurringTaskMaterializer? materializer}) {
           : null;
 
       // scheduledTime необязателен: null значит «время не задано».
+      // Неразборчивое значение — ошибка, а не тихое отсутствие времени:
+      // иначе пользователь попросил «в 10:00», а задача молча уехала в
+      // «на весь день», и он об этом не узнал.
+      final scheduledTimeError = scheduledTimeErrorIn(data);
+      if (scheduledTimeError != null) {
+        return jsonResponse(400, {'error': scheduledTimeError});
+      }
       final scheduledTime = parseScheduledTime(data);
 
       // Парсинг дат: поддерживаем ISO 8601 строки (например, "2026-08-20T14:30:00Z")
@@ -456,6 +477,10 @@ Router createRouter(AppDatabase db, {RecurringTaskMaterializer? materializer}) {
           data['actualMinutes'] is int ? data['actualMinutes'] as int : null;
 
       // null в scheduledTime сбрасывает время начала в течение дня.
+      final scheduledTimeBad = scheduledTimeErrorIn(data);
+      if (scheduledTimeBad != null) {
+        return jsonResponse(400, {'error': scheduledTimeBad});
+      }
       final int? scheduledTime =
           data.containsKey('scheduledTime') ? parseScheduledTime(data) : null;
 
@@ -1458,9 +1483,13 @@ Router createRouter(AppDatabase db, {RecurringTaskMaterializer? materializer}) {
       final dayLocal =
           DateTime(targetDate.year, targetDate.month, targetDate.day);
 
+      // Мягкие события (canOverlap) в раскладке не участвуют: по задумке
+      // это короткие дела внутри другого блока (звонок, запись к врачу),
+      // которые не должны вытеснять задачи. В плане они остаются отдельными
+      // элементами — просто не занимают место в сетке.
       final busy = <BusyInterval>[
         for (final event in events)
-          if (event.endsAt != null)
+          if (event.endsAt != null && !event.canOverlap)
             (
               start: event.startsAt.toLocal(),
               end: event.endsAt!.toLocal(),
@@ -1472,6 +1501,7 @@ Router createRouter(AppDatabase db, {RecurringTaskMaterializer? materializer}) {
           if (task.estimatedMinutes != null)
             SchedulableTask(
               refId: task.id,
+              title: task.title,
               durationMinutes: task.estimatedMinutes!,
               scheduledTime: task.scheduledTime,
               priority: task.importance * 10 + task.urgency,
@@ -1480,6 +1510,7 @@ Router createRouter(AppDatabase db, {RecurringTaskMaterializer? materializer}) {
           if (task.estimatedMinutes != null)
             SchedulableTask(
               refId: task.id,
+              title: task.title,
               durationMinutes: task.estimatedMinutes!,
               scheduledTime: task.scheduledTime,
               isOverdue: true,
@@ -1512,16 +1543,47 @@ Router createRouter(AppDatabase db, {RecurringTaskMaterializer? materializer}) {
         );
       }
 
-      // Задачи, которые не удалось разместить: без оценки времени или
-      // не поместились в день. Время оставляем null — честнее, чем
-      // притворяться, что слот есть.
+      // Задачи с оценкой, но без свободного слота. Раньше они молча
+      // пропадали из плана: попадали в `overflowing`, который никто не
+      // использовал. Теперь попадают в план без интервала с явной пометкой —
+      // пользователь должен видеть, что задача не влезла, а не гадать,
+      // куда она делась.
       final placedIds = layout.tasks.map((t) => t.refId).toSet();
+      final overflowing = <Task>[
+        for (final task in layout.unplaced)
+          if (tasksById[task.refId] case final task?) task,
+      ];
+      for (final task in overflowing) {
+        final isOverdue = overdueIdSet.contains(task.id);
+        // Причину даёт планировщик: он знает, что именно пересеклось.
+        // Формулировки обязаны держать маркер [DayScheduler.didNotFit] —
+        // по нему MCP отличает «не поместилась» от «задача на весь день».
+        final reason = layout.reasons[task.id] ??
+            '${DayScheduler.didNotFit}причина неизвестна';
+        await dailyPlansDao.addItem(
+          planId: plan.id,
+          itemType: PlanItemType.task,
+          refId: task.id,
+          startTime: targetDate,
+          endTime: null,
+          note: isOverdue
+              ? 'OVERDUE: ${task.title} ($reason)'
+              : '${task.title} ($reason)',
+        );
+      }
+
+      // Задачи, у которых вообще нет оценки времени: слота для них не
+      // существует, поэтому честно оставляем без интервала.
       final unplaced = [
         for (final task in scheduledTasks)
-          if (!placedIds.contains(task.id) && task.estimatedMinutes == null)
+          if (!placedIds.contains(task.id) &&
+              !overflowing.any((t) => t.id == task.id) &&
+              task.estimatedMinutes == null)
             task,
         for (final task in overdueIds)
-          if (!placedIds.contains(task.id) && task.estimatedMinutes == null)
+          if (!placedIds.contains(task.id) &&
+              !overflowing.any((t) => t.id == task.id) &&
+              task.estimatedMinutes == null)
             task,
       ];
       for (final task in unplaced) {
@@ -1536,13 +1598,6 @@ Router createRouter(AppDatabase db, {RecurringTaskMaterializer? materializer}) {
         );
       }
 
-      // Задачи с оценкой, но без свободного слота — сообщаем отдельно, чтобы
-      // MCP мог сказать «в день не влезает», а не молча не показать задачу.
-      final overflowing = layout.unplaced
-          .map((t) => tasksById[t.refId])
-          .whereType<Task>()
-          .toList();
-
       // Возвращаем полный план с элементами
       final result = await dailyPlansDao.getPlanWithItems(plan.id);
       return jsonResponse(200, {
@@ -1554,6 +1609,8 @@ Router createRouter(AppDatabase db, {RecurringTaskMaterializer? materializer}) {
           'overdueTasks': overdueTasks
               .where((t) => !scheduledTaskIds.contains(t.id))
               .length,
+          'unplacedTasks': overflowing.length,
+          'withoutEstimate': unplaced.length,
         },
       });
     } catch (e, stackTrace) {
