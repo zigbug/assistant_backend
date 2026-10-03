@@ -217,7 +217,11 @@ Router createRouter(AppDatabase db, {RecurringTaskMaterializer? materializer}) {
   // Возвращает текущее время сервера в UTC и в часовом поясе пользователя.
   // Нужен AI/MCP, чтобы понимать, какой сейчас момент в системе:
   //   - serverTimeUtc     — сейчас в UTC (ISO 8601)
-  //   - serverTimeLocal   — сейчас в поясе пользователя (если известен offset)
+  //   - serverTimeLocal   — сейчас в поясе пользователя, либо null, если
+  //                         смещение неизвестно. Смещение входит в строку
+  //                         явно («+03:00»): помечать местное время буквой
+  //                         «Z» нельзя, иначе клиент считает его UTC и
+  //                         ошибается на всё смещение (см. TimeContext).
   //   - timezone          — имя пояса из Preferences (по умолчанию Europe/Moscow)
   //   - utcOffsetMinutes  — смещение от UTC (null, если пояс не распознан;
   //                         можно задать явно через preference utc_offset_minutes)
