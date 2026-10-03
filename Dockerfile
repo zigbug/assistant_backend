@@ -9,6 +9,17 @@ WORKDIR /app
 # недоступном непривилегированному пользователю (permission denied).
 ENV PUB_CACHE=/app/.pub-cache
 
+# Локальная зона. Планировщик раскладывает задачи по локальным часам
+# (`scheduled_time` = «09:00» значит 09:00 у пользователя), а даты-без-времени
+# хранятся как локальная полночь. Без tzdata контейнер откатывается на UTC, и
+# тогда «09:00» встало бы в 12:00 по Москве, а план на 02.10 показывался
+# как 01.10.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV TZ=Europe/Moscow
+
 # Непривилегированный пользователь для запуска сервера
 RUN groupadd --system app \
     && useradd --system --gid app --home-dir /app app

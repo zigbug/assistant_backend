@@ -13,6 +13,11 @@ services:
       API_KEY: ${API_KEY}
       HOST: 0.0.0.0
       PORT: "8081"
+      # Локальная зона для планировщика и date-only полей. Обязательна в обоих
+      # сервисах: backend раскладывает задачи по локальным часам, MCP
+      # форматирует даты в локальной зоне своего процесса. Без неё оба
+      # откатываются на UTC и «локальная полночь» уезжает на сутки назад.
+      TZ: ${TZ:-Europe/Moscow}
       # Куда писать SQLite-базу (путь внутри контейнера, смонтирован в volume)
       DATA_DIR: /app/data
     volumes:
@@ -26,6 +31,7 @@ services:
     environment:
       BACKEND_URL: http://backend:8081/api/v1
       API_KEY: ${API_KEY}
+      TZ: ${TZ:-Europe/Moscow}
       MCP_HOST: 0.0.0.0
       MCP_PORT: 8082
       MCP_PATH: ${MCP_SECRET_PATH}
