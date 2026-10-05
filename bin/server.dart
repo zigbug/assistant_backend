@@ -1454,6 +1454,11 @@ Router createRouter(AppDatabase db, {RecurringTaskMaterializer? materializer}) {
                 e.startsAt.isSmallerThanValue(targetEnd)))
           .get();
 
+      // Считаем элементы плана, а не строки выборки: повторяющиеся события
+      // добавляются ниже отдельными появлениями, и в плане их больше, чем
+      // в исходном списке. Иначе stats.events врал бы про свой же план.
+      var eventItemCount = 0;
+
       for (final event in events) {
         // Длительность события берём из endsAt. Если его нет (событие
         // «на весь день» или длительность не задана) — endTime не выставляем,
@@ -1468,6 +1473,7 @@ Router createRouter(AppDatabase db, {RecurringTaskMaterializer? materializer}) {
               ? '${event.title} (мягкое: не вытесняет другие блоки)'
               : event.title,
         );
+        eventItemCount++;
       }
 
       // === Повторяющиеся события: разворот на целевой день ===
@@ -1501,6 +1507,7 @@ Router createRouter(AppDatabase db, {RecurringTaskMaterializer? materializer}) {
               ? '${event.title} (повтор, мягкое: не вытесняет другие блоки)'
               : '${event.title} (повтор)',
         );
+        eventItemCount++;
       }
 
       // === Раскладываем задачи дня по свободным слотам ===
@@ -1642,7 +1649,7 @@ Router createRouter(AppDatabase db, {RecurringTaskMaterializer? materializer}) {
         'plan': result.plan.toJson(),
         'items': result.items.map((i) => i.toJson()).toList(),
         'stats': {
-          'events': events.length,
+          'events': eventItemCount,
           'scheduledTasks': scheduledTasks.length,
           'overdueTasks': overdueTasks
               .where((t) => !scheduledTaskIds.contains(t.id))

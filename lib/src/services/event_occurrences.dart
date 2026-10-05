@@ -48,8 +48,16 @@ EventOccurrence? occurrenceOn({
 }) {
   if (recurrence == Recurrence.none) return null;
 
-  final baseDay = midnightUtc(startsAt);
-  final targetDay = midnightUtc(dayUtc);
+  // База приходит из базы в локальной зоне процесса, поэтому компоненты
+  // `.hour` нельзя подставлять в `DateTime.utc` — это сдвинуло бы блок на
+  // offset. Считаем время суток как расстояние от полуночи UTC: разница
+  // зависит только от момента, а не от флага isUtc.
+  final startsUtc = startsAt.toUtc();
+  final endsUtc = endsAt?.toUtc();
+
+  final baseDay = midnightUtc(startsUtc);
+  final targetDay = midnightUtc(dayUtc.toUtc());
+  final timeOfDay = startsUtc.difference(baseDay);
 
   // База и всё, что до неё, — не наш день (база приходит прямым выбором).
   if (!targetDay.isAfter(baseDay)) return null;
@@ -81,18 +89,8 @@ EventOccurrence? occurrenceOn({
 
   if (!occurs) return null;
 
-  final start = DateTime.utc(
-    targetDay.year,
-    targetDay.month,
-    targetDay.day,
-    startsAt.hour,
-    startsAt.minute,
-    startsAt.second,
-    startsAt.millisecond,
-    startsAt.microsecond,
-  );
-
-  final duration = endsAt?.difference(startsAt);
+  final start = targetDay.add(timeOfDay);
+  final duration = endsUtc?.difference(startsUtc);
   DateTime? end;
   if (duration != null) end = start.add(duration);
 

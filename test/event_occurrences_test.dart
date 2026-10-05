@@ -112,6 +112,30 @@ void main() {
       expect(o.end, isNull);
     });
 
+    test('локальный DateTime из базы не сдвигает блок на offset', () {
+      // Drift отдаёт колонку DateTime в локальной зоне процесса. Если брать
+      // компоненты .hour и подставлять их в DateTime.utc, блок уедет на
+      // offset: база 06:00Z превратилась бы в 09:00Z. Считаем время суток
+      // как расстояние от полуночи UTC — тогда флаг isUtc не важен.
+      final local = DateTime(2026, 10, 5, 9);
+      final baseUtc = local.toUtc();
+      final expected = DateTime.utc(2026, 10, 6)
+          .add(baseUtc.difference(DateTime.utc(2026, 10, 5)));
+
+      final o = occurrenceOn(
+        eventId: 1,
+        startsAt: local,
+        endsAt: local.add(const Duration(hours: 5)),
+        recurrence: Recurrence.daily,
+        byWeekdays: 0,
+        dayUtc: day(6),
+      );
+
+      expect(o!.start, expected);
+      expect(o.start.isUtc, isTrue);
+      expect(o.end!.difference(o.start), const Duration(hours: 5));
+    });
+
     test('ночное событие не уезжает на соседний день', () {
       // 23:30–00:30: начало в нужном дне, конец — уже за полночь.
       final start = DateTime.utc(2026, 10, 5, 23, 30);
