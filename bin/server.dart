@@ -15,6 +15,7 @@ import 'package:assistant_backend/src/database/daos/preferences_dao.dart';
 import 'package:assistant_backend/src/database/daos/projects_dao.dart';
 import 'package:assistant_backend/src/database/daos/tasks_dao.dart';
 import 'package:assistant_backend/src/services/day_scheduler.dart';
+import 'package:assistant_backend/src/services/event_occurrences.dart';
 import 'package:assistant_backend/src/services/recurring_task_materializer.dart';
 import 'package:assistant_backend/src/services/time_context.dart';
 
@@ -1466,6 +1467,39 @@ Router createRouter(AppDatabase db, {RecurringTaskMaterializer? materializer}) {
           note: event.canOverlap
               ? '${event.title} (мягкое: не вытесняет другие блоки)'
               : event.title,
+        );
+      }
+
+      // === Повторяющиеся события: разворот на целевой день ===
+      //
+      // Событие с recurrence хранится в базе одной строкой, поэтому прямой
+      // выбор по startsAt ловит только базовый день. Для остальных дней
+      // считаем появление явно: так «рабочий блок по будням» с одним
+      // recurrence покрывает неделю одной строкой, а не семью событиями.
+      final recurringEvents = await (db.select(db.events)
+            ..where((e) => e.recurrence.isNotValue(Recurrence.none.name)))
+          .get();
+
+      for (final event in recurringEvents) {
+        final occurrence = occurrenceOn(
+          eventId: event.id,
+          startsAt: event.startsAt,
+          endsAt: event.endsAt,
+          recurrence: event.recurrence,
+          byWeekdays: event.byWeekdays,
+          dayUtc: targetDate,
+        );
+        if (occurrence == null) continue;
+
+        await dailyPlansDao.addItem(
+          planId: plan.id,
+          itemType: PlanItemType.event,
+          refId: occurrence.eventId,
+          startTime: occurrence.start,
+          endTime: occurrence.end,
+          note: event.canOverlap
+              ? '${event.title} (повтор, мягкое: не вытесняет другие блоки)'
+              : '${event.title} (повтор)',
         );
       }
 
