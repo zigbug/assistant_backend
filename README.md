@@ -173,6 +173,23 @@ SQLite-база хранится в volume `backend_data` и переживае�
 контейнеров. Порты проброшены только на `127.0.0.1` — наружу трафик
 отдаётся через reverse proxy.
 
+### Образ: AOT, а не JIT
+
+Dockerfile собирает сервер заранее — `dart build cli` (AOT) — и кладёт
+готовый бинарник в минимальный рантайм (`distroless/cc-debian12`). Раньше
+контейнер запускал `dart run bin/server.dart` (JIT): это обходило старые
+проблемы `dart compile exe` с build hooks пакета `sqlite3`, но тащило весь
+Dart SDK. Разница:
+
+| | JIT (`dart run`) | AOT (`dart build cli`) |
+|---|---|---|
+| Образ | ~2.5 ГБ | ~55 МБ |
+| RSS процесса | ~250 МБ | ~12 МБ |
+
+`dart build cli` (Dart 3.13+) умеет и build hooks, и AOT, поэтому
+нативный `libsqlite3.so` собирается и линкуется корректно — специальных
+костылей больше не нужно.
+
 ## Лицензия
 
 MIT
